@@ -9,12 +9,7 @@ const FinStore = {
   saveTxs(a){ localStorage.setItem(this.txKey, JSON.stringify(a||[])); },
   loadRules(){ try{ return JSON.parse(localStorage.getItem(this.rulesKey)||'[]'); }catch(e){ return []; } },
   saveRules(a){ localStorage.setItem(this.rulesKey, JSON.stringify(a||[])); },
-  wipe(){
-    localStorage.removeItem('finapp_cfg_v2');
-    localStorage.removeItem('finapp_receipts_v2');
-    localStorage.removeItem('finapp_txs_v2');
-    localStorage.removeItem('finapp_rules_v2');
-  }
+  wipe(){ try{ localStorage.removeItem('finapp_cfg_v2'); localStorage.removeItem('finapp_receipts_v2'); localStorage.removeItem('finapp_txs_v2'); localStorage.removeItem('finapp_rules_v2'); }catch(e){} }
 };
 function inPeriod(dateISO, period){
   const d = new Date(dateISO); if (isNaN(d)) return false;
@@ -26,7 +21,7 @@ function inPeriod(dateISO, period){
   return d>=start && d<=now;
 }
 function exportCSV(filename, rows){
-  const esc = (v)=>('"'+String(v).replace(/"/g,'""')+'"');
+  const esc = (v)=>('\"'+String(v).replace(/\"/g,'\"\"')+'\"');
   const csv = rows.map(r=>r.map(esc).join(',')).join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
   const url = URL.createObjectURL(blob);

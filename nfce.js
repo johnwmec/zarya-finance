@@ -1,15 +1,14 @@
 
 function brToNumber(txt){
   if (txt == null) return null;
-  const s = String(txt).replace(/\u00A0/g,' ').trim();
+  const s = String(txt).replace(/\u00A0/g,' ').trim().replace(/\s/g,'');
   if (!s) return null;
-  // remove milhares ".", troca "," por "."
-  const n = s.replace(/\./g,'').replace(',','.');
+  const cleaned = s.replace(/[R$\s]/gi,'');
+  const n = cleaned.replace(/\./g,'').replace(',', '.');
   const v = parseFloat(n);
   return isNaN(v) ? null : v;
 }
 function toISO(dateStr, timeStr){
-  // aceita "dd/mm/aaaa" e hora "hh:mm(:ss)"
   if (!dateStr) return new Date().toISOString();
   const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(dateStr);
   if (!m) return new Date().toISOString();
@@ -21,133 +20,152 @@ function toISO(dateStr, timeStr){
   }
   return `${y}-${mo}-${d}T${hh}:${mm}:${ss}`;
 }
+function clean(s){ return String(s||'').replace(/\s+/g,' ').replace(/\u00A0/g,' ').trim(); }
+function text(node){ return clean(node?.textContent||''); }
 
-async function fetchNfceViaAppsScriptV3(nfceUrl){
-  const cfg = FinStore.loadCfg();
-  if(!cfg.endpoint) throw new Error('Defina o endpoint do Apps Script em Config.');
-  // aceita tanto POST (corpo JSON) quanto GET (?url=...)
-  const tryPost = async() => {
-    const resp = await fetch(cfg.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: nfceUrl, v:3 }) });
-    if (!resp.ok) throw new Error('Falha no parser ('+resp.status+')');
-    return await resp.json();
-  };
-  try {
-    return await tryPost();
-  } catch(e){
-    const sep = cfg.endpoint.includes('?') ? '&' : '?';
-    const resp = await fetch(`${cfg.endpoint}${sep}url=${encodeURIComponent(nfceUrl)}&v=3`);
-    if (!resp.ok) throw new Error('Falha no parser GET ('+resp.status+')');
-    return await resp.json();
-  }
-}
-
-async function fetchNfceViaProxy(nfceUrl){
+async function fetchHtmlViaProxy(nfceUrl){
   const proxied = 'https://r.jina.ai/http://'+ nfceUrl.replace(/^https?:\/\//i,'').replace(/^\/\//,'');
   const resp = await fetch(proxied);
   if (!resp.ok) throw new Error('Proxy falhou ('+resp.status+')');
-  const html = await resp.text();
-  return parseNfceHtmlRobusto(html, nfceUrl);
+  return await resp.text();
+}
+async function fetchViaAppsScript(nfceUrl){
+  const cfg = FinStore.loadCfg();
+  if(!cfg.endpoint) throw new Error('Defina o endpoint do Apps Script em Config.');
+  try{
+    const resp = await fetch(cfg.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: nfceUrl, v:3, raw:true }) });
+    if (!resp.ok) throw new Error('Falha no parser ('+resp.status+')');
+    return await resp.text();
+  }catch(e){
+    const sep = cfg.endpoint.includes('?') ? '&' : '?';
+    const resp = await fetch(`${cfg.endpoint}${sep}url=${encodeURIComponent(nfceUrl)}&v=3&raw=true`);
+    if (!resp.ok) throw new Error('Falha no parser GET ('+resp.status+')');
+    return await resp.text();
+  }
 }
 
-function parseNfceHtmlRobusto(html, url){
-  // Utiliza múltiplos padrões por portal
-  function pick(text, arr){ for (let re of arr){ const m = re.exec(text); if (m && m[1]) return m[1]; } return ''; }
-  function clean(s){ return String(s||'').replace(/\s+/g,' ').replace(/\u00A0/g,' ').trim(); }
-  const emitente = clean(pick(html,[
-    /Raz[aã]o Social[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /Emitente[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /<span[^>]*class="txtTopo"[^>]*>([^<]+)/i
-  ]));
-  const cnpjRaw = pick(html,[
-    /CNPJ[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /CNPJ:\s*<\/span>\s*<span[^>]*>([^<]+)/i,
-    /CNPJ:\s*<\/td>\s*<td[^>]*>([^<]+)/i
-  ]);
-  const cnpj = (cnpjRaw||'').replace(/\D+/g,'');
+function parseWithDOM(html, url){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  let emitente='', cnpj='', documento='';
+  const allRows = Array.from(doc.querySelectorAll('table tr'));
+  for(const tr of allRows){
+    const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
+    if (tds.length>=2){
+      if (!emitente && /raz[aã]o social|emitente|nome\/raza[oã]/i.test(tds[0])) emitente = tds[1];
+      if (!cnpj && /cnpj/i.test(tds[0])) cnpj = tds[1].replace(/\D+/g,'');
+      if (!documento && /(cpf.*consumidor|cpf\/cnpj.*consumidor|cpf do consumidor)/i.test(tds[0])) documento = tds[1];
+    }
+  }
+  if (!emitente){
+    const topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2');
+    emitente = clean(topo?.textContent||'');
+  }
+  let dataBR = '', hora = '';
+  const labels = ['Data de Emissão','Data/Hora da Emissão','Emissão'];
+  for (const tr of allRows){
+    const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
+    if (tds.length>=2){
+      if (labels.some(l=>tds[0].includes(l))){
+        const val = tds[1];
+        const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(val);
+        const hm = /(\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/.exec(val);
+        if (dm) dataBR = dm[1];
+        if (hm) hora = hm[1];
+      }
+    }
+  }
+  if (!dataBR){
+    const m = /Data\/Hora da Emiss[aã]o[^<]*>\s*([^<]+)/i.exec(html);
+    if (m){ const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(m[1]); const hm = /(\d{2}:\d{2}(:\d{2})?)/.exec(m[1]); dataBR = dm?dm[1]:''; hora = hm?hm[1]:''; }
+  }
+  const dataISO = toISO(dataBR, hora);
 
-  const documento = clean(pick(html,[
-    /CPF\/CNPJ do Consumidor[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /CPF do Consumidor[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /CPF:\s*<\/td>\s*<td[^>]*>([^<]+)/i
-  ])) || '';
+  let valorTotal = null;
+  for (const tr of allRows){
+    const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
+    if (tds.length>=2 && /valor\s*(total|a pagar)/i.test(tds[0])){ valorTotal = brToNumber(tds[1]); break; }
+  }
+  if (valorTotal==null){
+    const nodes = Array.from(doc.querySelectorAll('td, span, div')).map(e=>clean(e.textContent));
+    const totalSpan = nodes.find(t=>/^total\s*r\$/i.test(t));
+    if (totalSpan){ const num = totalSpan.replace(/[^0-9\.,]/g,''); valorTotal = brToNumber(num); }
+  }
+  valorTotal = valorTotal ?? 0;
 
-  const dataEm = clean(pick(html,[
-    /Data\s*de\s*Emiss[aã]o[^<]*<\/td>\s*<td[^>]*>(\d{2}\/\d{2}\/\d{4})/i,
-    /Emiss[aã]o[^<]*<\/td>\s*<td[^>]*>(\d{2}\/\d{2}\/\d{4})/i,
-    /Data\/Hora da Emiss[aã]o[^<]*<\/td>\s*<td[^>]*>(\d{2}\/\d{2}\/\d{4})/i
-  ]));
-  const horaEm = clean(pick(html,[
-    /Hora\s*de\s*Emiss[aã]o[^<]*<\/td>\s*<td[^>]*>(\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/i,
-    /Data\/Hora da Emiss[aã]o[^<]*<\/td>\s*<td[^>]*>\d{2}\/\d{2}\/\d{4}\s+(\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/i
-  ]));
-  const dataISO = toISO(dataEm, horaEm);
-
-  // Valor total (padrões variados)
-  const totalRaw = pick(html,[
-    /Valor\s*Total[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /Valor a Pagar[^<]*<\/td>\s*<td[^>]*>([^<]+)/i,
-    /TOTAL\s*R\$\s*([^<]+)/i,
-    /Valor\s*Total\s*da\s*Nota[^<]*<\/td>\s*<td[^>]*>([^<]+)/i
-  ]);
-  const valorTotal = brToNumber(totalRaw) ?? 0;
+  const items = [];
+  const tables = Array.from(doc.querySelectorAll('table'));
+  for (const table of tables){
+    const headers = Array.from(table.querySelectorAll('th')).map(th=>clean(th.textContent));
+    if (headers.length){
+      const hasDesc = headers.some(h=>/descri[cç][aã]o|produto/i.test(h));
+      const hasVTotal = headers.some(h=>/valor\s*total|vl\.?\s*total/i.test(h));
+      if (hasDesc && hasVTotal){
+        const trs = Array.from(table.querySelectorAll('tr'));
+        for (const tr of trs.slice(1)){
+          const cells = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.textContent));
+          if (cells.length<2) continue;
+          const desc = cells[0]; if (!desc || /\bdescri[cç][aã]o\b/i.test(desc)) continue;
+          let qtd = null, un = '', vun = null, vtot = null;
+          headers.forEach((h,idx)=>{
+            const val = cells[idx] || '';
+            if (/qtde|quantidade/i.test(h)) qtd = brToNumber(val);
+            if (/unidade|un\b|und/i.test(h)) un = val;
+            if (/valor\s*unit|vl\.?\s*unit/i.test(h)) vun = brToNumber(val);
+            if (/valor\s*total|vl\.?\s*total/i.test(h)) vtot = brToNumber(val);
+          });
+          if (vtot==null){ const lastNum = cells.slice().reverse().find(c=>/[\d\.,]/.test(c)); vtot = brToNumber(lastNum); }
+          if (qtd==null){ const n = cells.find(c=>/^\d+([\.,]\d+)?$/.test(c)); qtd = brToNumber(n)||1; }
+          if (!un){ const u = cells.find(c=>/^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c)); un = u||''; }
+          if (vun==null && vtot!=null && qtd){ vun = (vtot && qtd)? (vtot/qtd) : null; }
+          if (desc && vtot!=null && vtot>0) items.push({ descricao: desc, quantidade: qtd||1, unidade: un||'', valor_unitario: vun, valor_total: vtot });
+        }
+      }
+    }
+  }
+  if (items.length===0){
+    const rows = Array.from(doc.querySelectorAll('tr.fixo-prod-serv, .linha-produto, .prod, [role="row"]'));
+    for (const row of rows){
+      const cells = Array.from(row.querySelectorAll('td, [role="cell"]')).map(e=>clean(e.textContent));
+      if (cells.length<3) continue;
+      const desc = cells[0];
+      const vtot = brToNumber(cells[cells.length-1]);
+      const qtd = brToNumber(cells.find(c=>/^\d+([\.,]\d+)?$/.test(c))) || 1;
+      const un = (cells.find(c=>/^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c)) || '');
+      const vun = (vtot && qtd) ? vtot/qtd : null;
+      if (desc && vtot) items.push({ descricao: desc, quantidade: qtd, unidade: un, valor_unitario: vun, valor_total: vtot });
+    }
+  }
 
   const uf = (url.match(/\/\/(\w{2})\./i)||[])[1]?.toUpperCase() || '';
   const chave = (url.match(/chNFe=([\d]{44})/i)||url.match(/p=([\d]{44})/i)||[])[1] || '';
 
-  // Itens — tenta tabela com cabeçalhos comuns; se falhar, usa regex genérica de 4 ou 5 colunas
-  const items = [];
-  try{
-    // Captura blocos <tr> entre seções com "Descrição" e "Vl. Total"
-    const headerIdx = html.search(/Descri[cç][aã]o/i);
-    const slice = headerIdx>0 ? html.slice(headerIdx) : html;
-    const rowRe = /<tr[^>]*>\s*(?:<td[^>]*>)+([\s\S]*?)<\/tr>/ig;
-    let m; 
-    while ((m = rowRe.exec(slice))!==null){
-      const rowHtml = m[1];
-      // extrai todas as células
-      const cells = Array.from(rowHtml.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/ig)).map(mm=>clean(mm[1]));
-      if (cells.length<4 || cells.length>8) continue;
-      // Heurística: descrição = célula com mais letras; valor total = última célula com "R$" ou número
-      const valorCand = cells.slice().reverse().find(c=>/[\d,\.]/.test(c));
-      const vtot = brToNumber((valorCand||'').replace(/[^\d\.,]/g,''));
-      if (vtot==null || vtot<=0) continue;
-      const desc = cells.sort((a,b)=>b.length-a.length)[0];
-      // quantidade e unidade: procure por números e siglas curtas
-      const qtdCand = cells.find(c=>/^(\d+([\.,]\d+)?)$/.test(c)) || cells.find(c=>/^\d+([\.,]\d+)?$/.test(c.replace(',','.')));
-      const unCand = cells.find(c=>/^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|METRO|M|LT)$/i.test(c)) || '';
-      const vlUnitCand = cells.find(c=>/^\d{1,3}(\.\d{3})*,\d{2}$/.test(c));
-      const q = brToNumber(qtdCand)||1;
-      const vu = brToNumber(vlUnitCand) || (q>0? (vtot/q): null);
-      items.push({ descricao: desc, quantidade: q, unidade: unCand, valor_unitario: vu, valor_total: vtot });
-    }
-  }catch(e){}
+  return { emitente, cnpj: cnpj?.replace(/\D+/g,''), documento, data: toISO(dataBR, hora), data_br: dataBR, hora, uf, chave, valor: valorTotal, items };
+}
 
-  return {
-    emitente, cnpj, documento, data: dataISO, data_br: dataEm, hora: horaEm,
-    uf, chave, valor: valorTotal, items
-  };
+async function fetchNfceAny(nfceUrl){
+  try{ return await fetchViaAppsScript(nfceUrl); }catch(e){ return await fetchHtmlViaProxy(nfceUrl); }
 }
 
 async function processNfceUrl(url){
-  let data=null, err1=null;
-  try{ data = await fetchNfceViaAppsScriptV3(url); }catch(e){ err1=e; }
-  if (!data){
-    try{ data = await fetchNfceViaProxy(url); }catch(e){ throw new Error((err1? err1.message+'; ':'') + e.message); }
-  }
-  // normaliza e salva
+  const html = await fetchNfceAny(url);
+  const data = await parseWithDOM(html, url);
   const arr = FinStore.loadReceipts();
-  arr.unshift({
-    id: crypto.randomUUID(),
-    emitente: data.emitente||'',
-    cnpj: data.cnpj||'',
-    documento: data.documento||'',
-    data: data.data || new Date().toISOString(),
-    valor: data.valor||0,
-    uf: data.uf||'',
-    chave: data.chave||'',
-    url,
-    itens: data.items||data.itens||[]
-  });
+  arr.unshift({ id: crypto.randomUUID(), emitente: data.emitente||'', cnpj: data.cnpj||'', documento: data.documento||'', data: data.data || new Date().toISOString(), valor: data.valor||0, uf: data.uf||'', chave: data.chave||'', url, itens: data.items||[] });
   FinStore.saveReceipts(arr);
   return arr[0];
 }
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  const btn = document.getElementById('btnDbgTest');
+  if (!btn) return;
+  btn.addEventListener('click', async ()=>{
+    const url = (document.getElementById('dbgUrl')?.value||'').trim();
+    const outEl = document.getElementById('dbgOut');
+    if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
+    try{
+      const html = await fetchNfceAny(url);
+      const data = await parseWithDOM(html, url);
+      if (outEl) outEl.textContent = JSON.stringify(data, null, 2).slice(0, 20000);
+    }catch(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; }
+  });
+});
