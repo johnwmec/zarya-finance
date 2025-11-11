@@ -210,6 +210,22 @@ document.getElementById('btnClearAll')?.addEventListener('click', ()=>{
 function fmtDate(s){ const d = new Date(s); return isNaN(d)? s : d.toLocaleString(); }
 function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
+// --- Handlers de Config ---
+document.getElementById('btnSaveCfg').addEventListener('click', ()=>{
+  const cfg = FinStore.loadCfg();
+  cfg.endpoint = (document.getElementById('endpoint').value || '').trim();
+  cfg.uf = (document.getElementById('uf').value || 'MG').trim().toUpperCase();
+  FinStore.saveCfg(cfg);
+  alert('Configurações salvas!');
+});
+
+document.getElementById('btnClearAll').addEventListener('click', ()=>{
+  if (confirm('Apagar TODOS os dados locais (config, notas e transações)?')) {
+    FinStore.wipe();
+    location.reload();
+  }
+});
+
 // init
 (function init(){
   const cfg = FinStore.loadCfg();
