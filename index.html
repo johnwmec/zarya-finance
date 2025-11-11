@@ -178,6 +178,7 @@
         </div>
         <div class="actions">
           <button id="btnDbgTest" class="btn">Testar</button>
+          <button id="btnDbgCopy" class="btn">Copiar HTML</button>
         </div>
         <pre id="dbgOut" class="small"></pre>
       </div>
@@ -419,7 +420,8 @@
         const html = await getHtml(url);
         return parseWithDOM(html, url);
       }
-      window.NFCE = { processNfceUrl: processNfceUrl, debug: debug };
+      async function debugRaw(url){ const html = await getHtml(url); const data = parseWithDOM(html,url); const title=(/<title>([^<]*)<\/title>/i.exec(html)||[])[1]||''; return { parsed:data, title, length: html.length, html_head: html.slice(0,12000), html_tail: html.slice(-8000) }; }
+      window.NFCE = { processNfceUrl: processNfceUrl, debug: debug, debugRaw: debugRaw };
     })();
   </script>
 
@@ -562,9 +564,16 @@
             var url = (document.getElementById('dbgUrl') && document.getElementById('dbgUrl').value || '').trim();
             var outEl = document.getElementById('dbgOut');
             if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
-            window.NFCE.debug(url).then(function(data){
-              if (outEl) outEl.textContent = JSON.stringify(data, null, 2).slice(0, 40000);
+            window.NFCE.debugRaw(url).then(function(pack){
+              if (outEl) outEl.textContent = JSON.stringify(pack, null, 2);
+              window.__DBG_HTML_HEAD = pack.html_head; window.__DBG_HTML_TAIL = pack.html_tail;
             }).catch(function(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; });
+          });
+          var dbgCopy = document.getElementById('btnDbgCopy');
+          if (dbgCopy) dbgCopy.addEventListener('click', function(){
+            var head = window.__DBG_HTML_HEAD||''; var tail=window.__DBG_HTML_TAIL||'';
+            var txt = head + '\n...[omissis]...\n' + tail;
+            navigator.clipboard.writeText(txt).then(function(){ alert('Trechos de HTML copiados para a área de transferência.'); }).catch(function(e){ alert('Falha ao copiar: '+e.message); });
           });
 
           // CONFIG
