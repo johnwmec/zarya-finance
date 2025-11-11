@@ -80,6 +80,20 @@
     #qr-reader{width:100%; min-height:320px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#000;}
     footer{opacity:.8;color:#a9a28a;text-align:center;padding:16px}
     a{color:var(--gold)}
+
+    
+    .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px}
+    .kpi{background:linear-gradient(180deg, rgba(212,175,55,.10), rgba(212,175,55,.04));border:1px solid var(--gold2);border-radius:14px;padding:12px}
+    .kpi h4{margin:0 0 6px 0;font-size:13px;color:#f7f3e4;opacity:.95}
+    .kpi .val{font-size:20px;font-weight:600;color:#f7f3e4}
+  
+    .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+    .chip{background:var(--btn);border:1px solid var(--btnb);color:var(--gold);border-radius:999px;padding:8px 12px;cursor:pointer;font-size:13px}
+    .chip.active{background:linear-gradient(180deg, rgba(212,175,55,.22), rgba(212,175,55,.1)); border-color:var(--gold2); color:#f7f3e4}
+
+    .range{display:flex;gap:8px;flex-wrap:wrap}
+    .range input{max-width:170px}
+
   </style>
 </head>
 <body>
@@ -100,6 +114,37 @@
       <button data-tab="settings">Config</button>
     </nav>
 
+
+    <div class="chips" id="chipsPeriod">
+      <span class="chip active" data-p="7d">7 dias</span>
+      <span class="chip" data-p="30d">30 dias</span>
+      <span class="chip" data-p="90d">90 dias</span>
+      <span class="chip" data-p="ano">Ano</span>
+      <span class="chip" data-p="tudo">Tudo</span>
+      <span class="chip" data-p="custom">Custom</span>
+      <span class="range" id="rangeCustom" style="display:none;">
+        <input type="date" id="dtIni"><input type="date" id="dtFim">
+        <button class="btn" id="btnApplyRange">Aplicar</button>
+      </span>
+    </div>
+    
+    <div class="kpis">
+      <div class="kpi">
+        <h4>Despesas (período)</h4>
+        <div class="val" id="kpiOut">R$ 0,00</div>
+      </div>
+      <div class="kpi">
+        <h4>Receitas (período)</h4>
+        <div class="val" id="kpiIn">R$ 0,00</div>
+      </div>
+      <div class="kpi">
+        <h4>Saldo (período)</h4>
+        <div class="val" id="kpiNet">R$ 0,00</div>
+      </div>
+    </div>
+
+
+    
     <!-- SCAN -->
     <section id="scan" class="active">
       <div class="grid">
