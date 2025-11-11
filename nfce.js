@@ -27,8 +27,7 @@ function parseNfceHtml(html, url){
   return { emitente: clean(emitente), cnpj, valor, data: dataEm || new Date().toISOString(), uf: uf.toUpperCase(), chave, items };
 }
 async function processNfceUrl(url){
-  let data=null, err1=null; try{ data = await fetchNfceViaAppsScript(url); }catch(e){ err1=e; }
-  if (!data){ data = await fetchNfceViaProxy(url); }
+  let data=null; try{ data = await fetchNfceViaAppsScript(url); }catch(e){ data = await fetchNfceViaProxy(url); }
   const arr = FinStore.loadReceipts();
   arr.unshift({ id: crypto.randomUUID(), emitente: data.emitente||'', cnpj: data.cnpj||'', data: data.data || new Date().toISOString(), valor: data.valor||0, uf: data.uf||'', chave: data.chave||'', url, itens: data.items||data.itens||[] });
   FinStore.saveReceipts(arr);

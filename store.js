@@ -9,7 +9,12 @@ const FinStore = {
   saveTxs(a){ localStorage.setItem(this.txKey, JSON.stringify(a||[])); },
   loadRules(){ try{ return JSON.parse(localStorage.getItem(this.rulesKey)||'[]'); }catch(e){ return []; } },
   saveRules(a){ localStorage.setItem(this.rulesKey, JSON.stringify(a||[])); },
-  wipe(){ ['cfgKey','recKey','txKey','rulesKey'].forEach(k=>localStorage.removeItem(this[k])); }
+  wipe(){
+    localStorage.removeItem('finapp_cfg_v2');
+    localStorage.removeItem('finapp_receipts_v2');
+    localStorage.removeItem('finapp_txs_v2');
+    localStorage.removeItem('finapp_rules_v2');
+  }
 };
 function inPeriod(dateISO, period){
   const d = new Date(dateISO); if (isNaN(d)) return false;
