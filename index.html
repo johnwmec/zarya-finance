@@ -1,4 +1,3 @@
-<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0"></script>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -7,78 +6,134 @@
   <meta name="theme-color" content="#0b0b0b" />
   <link rel="manifest" href="manifest.json" />
   <title>Zarya Finance</title>
+
+  <!-- Visual premium/dourado -->
   <style>
     :root{
-      --bg:#0b0b0b; --bg2:#111111; --card:#121212; --border:#282218;
-      --text:#f0eee6; --muted:#b9b3a1; --gold:#d4af37; --gold2:#c39a2b;
-      --btn:#1a150b; --btnb:#3a2f16;
+      --bg:#0a0a0a; --bg2:#0f0f0f; --card:#121212; --border:#2a2216;
+      --text:#f5f3e9; --muted:#bfb79e; --gold:#d4af37; --gold2:#b8952f; --gold3:#f3d46a;
+      --btn:#15110a; --btnb:#3a2f16; --accentShadow: 0 0 0 1px rgba(212,175,55,.25), 0 8px 24px rgba(212,175,55,.15);
     }
     *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;margin:0;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 16px;z-index:10}
-    h1{font-size:18px;margin:0;letter-spacing:.3px}
-    h1 .brand{color:var(--gold)}
-    main{padding:16px;max-width:980px;margin:0 auto}
+    html,body{height:100%}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;margin:0;background:linear-gradient(180deg,#0a0a0a,#0d0d0d 15%,#0a0a0a);color:var(--text)}
+    header{
+      position:sticky;top:0;z-index:20;background:linear-gradient(180deg,rgba(212,175,55,.08),rgba(212,175,55,.02));
+      border-bottom:1px solid var(--border); padding:14px 16px;
+      backdrop-filter: blur(6px);
+    }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      font-weight:700; letter-spacing:.4px; font-size:18px;
+    }
+    .brand .badge{
+      width:30px;height:30px;border-radius:10px;border:1px solid var(--gold2);
+      display:grid;place-items:center;color:var(--gold);background:#0c0c0c; box-shadow: var(--accentShadow);
+    }
+    .brand .name{color:var(--gold)}
+    main{padding:18px;max-width:1100px;margin:0 auto}
     nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
-    nav button{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
-    nav button.active{background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08)); border-color:var(--gold2); color:#f7f3e4}
+    nav button{
+      background:var(--btn);color:var(--gold);border:1px solid var(--btnb);
+      border-radius:12px;padding:10px 14px;cursor:pointer;transition:transform .06s ease, box-shadow .2s ease;
+    }
+    nav button:hover{transform:translateY(-1px); box-shadow: var(--accentShadow);}
+    nav button.active{
+      background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08));
+      border-color:var(--gold2); color:#fff
+    }
     section{display:none}
     section.active{display:block}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+
+    .grid{display:grid;grid-template-columns:1.2fr 1fr; gap:14px}
+    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+
+    .card{
+      background:radial-gradient(1200px 300px at -10% -10%, rgba(212,175,55,.04), transparent 60%) , var(--card);
+      border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:14px; box-shadow: 0 1px 0 rgba(255,255,255,.02);
+    }
+    h3{margin:0 0 10px 0; font-size:16px}
     label{display:block;margin:8px 0 6px}
-    input,textarea,select{width:100%;border:1px solid var(--border);background:#0e0e0e;color:var(--text);border-radius:10px;padding:10px}
+    input,textarea,select{
+      width:100%;border:1px solid var(--border);background:#0e0e0e;color:var(--text);
+      border-radius:10px;padding:10px
+    }
     table{width:100%;border-collapse:collapse}
     th,td{border-bottom:1px solid var(--border); padding:8px; text-align:left; font-size:14px}
-    .muted{opacity:.85;font-size:12px;color:var(--muted)}
+    .muted{opacity:.9;font-size:12px;color:var(--muted)}
     .row{display:flex;gap:12px;flex-wrap:wrap}
     .row > *{flex:1 1 260px}
     .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    .btn{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
-    .btn.primary{background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08)); border-color:var(--gold2); color:#f7f3e4}
-    video{width:100%;max-height:340px;border-radius:12px;border:1px solid var(--border);background:#000}
-    .small{font-size:12px}
+    .btn{
+      background:var(--btn);color:var(--gold);border:1px solid var(--btnb);
+      border-radius:12px;padding:10px 14px;cursor:pointer; transition:transform .06s ease, box-shadow .2s ease;
+    }
+    .btn:hover{transform:translateY(-1px); box-shadow: var(--accentShadow);}
+    .btn.primary{
+      background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08));
+      border-color:var(--gold2); color:#fff
+    }
+    .pill{display:inline-block;padding:4px 8px;border:1px solid var(--gold2);border-radius:999px;color:var(--gold);font-size:12px}
+    .empty{border:1px dashed var(--border);border-radius:12px;padding:16px;text-align:center;color:var(--muted)}
+    .ok{color:#8de38d} .err{color:#ff8f8f}
+    /* QR Reader box */
+    #qr-reader{width:100%; min-height:320px; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#000;}
+    footer{opacity:.8;color:#a9a28a;text-align:center;padding:16px}
     a{color:var(--gold)}
   </style>
 </head>
 <body>
-  <header><h1><span class="brand">Zarya Finance</span> • NFC-e + OFX (PWA)</h1></header>
+  <header>
+    <div class="brand">
+      <div class="badge">Z</div>
+      <div><span class="name">Zarya Finance</span><div class="muted">NFC-e + OFX • Relatórios</div></div>
+    </div>
+  </header>
+
   <main>
     <nav>
       <button data-tab="scan" class="active">Scanner NFC-e</button>
       <button data-tab="receipts">Notas</button>
       <button data-tab="import">Importar OFX</button>
       <button data-tab="txs">Lançamentos</button>
-      <button data-tab="match">Conciliação</button>
       <button data-tab="reports">Relatórios</button>
       <button data-tab="settings">Config</button>
     </nav>
 
+    <!-- SCAN -->
     <section id="scan" class="active">
-      <div class="card">
-        <p class="muted">Use a câmera para ler o QR da NFC-e. Se o navegador não suportar, fotografe o QR ou cole a URL.</p>
-        <div class="row">
-          <div>
-            <video id="video" playsinline></video>
-            <div class="actions">
-              <button id="btnStart" class="btn primary">Iniciar câmera</button>
-              <button id="btnStop" class="btn">Parar</button>
-              <button id="btnSnap" class="btn">Capturar imagem</button>
-            </div>
-            <p id="scanStatus" class="small muted">Status: inativo</p>
+      <div class="grid">
+        <div class="card">
+          <h3>Leitor QR (html5-qrcode)</h3>
+          <div id="qr-reader"></div>
+          <div class="actions">
+            <button id="btnStartQR" class="btn primary">Iniciar leitor</button>
+            <button id="btnStopQR" class="btn">Parar</button>
           </div>
-          <div>
-            <label for="qrUrl">Ou cole a URL do QR Code</label>
-            <input id="qrUrl" placeholder="https://...">
-            <div class="actions">
-              <button id="btnProcessUrl" class="btn">Processar URL</button>
-            </div>
-            <p class="small muted">Dica: aponte a câmera nativa do celular para o QR e copie a URL exibida.</p>
+          <p id="scanStatus" class="muted">Status: inativo</p>
+        </div>
+
+        <div class="card">
+          <h3>Colar URL do QR</h3>
+          <label for="qrUrl">URL completa do QR da NFC-e</label>
+          <input id="qrUrl" placeholder="https://...">
+          <div class="actions">
+            <button id="btnProcessUrl" class="btn">Processar URL</button>
+          </div>
+          <p class="muted">Dica: aponte a câmera nativa do celular para o QR, copie a URL e cole aqui.</p>
+          <div class="empty">
+            <div>Precisando: <span class="pill">Config → Endpoint do Parser (Apps Script)</span></div>
           </div>
         </div>
       </div>
-      <div class="card"><h3>Resultado</h3><pre id="result" class="small"></pre></div>
+
+      <div class="card">
+        <h3>Resultado</h3>
+        <pre id="result" class="muted"></pre>
+      </div>
     </section>
 
+    <!-- NOTAS -->
     <section id="receipts">
       <div class="card">
         <div class="actions">
@@ -89,82 +144,82 @@
           <thead><tr><th>Data</th><th>Emitente</th><th>Valor</th><th>Itens</th><th>UF</th></tr></thead>
           <tbody></tbody>
         </table>
+        <div id="emptyReceipts" class="empty" style="display:none">Sem notas ainda. Escaneie um QR ou cole a URL para começar.</div>
       </div>
     </section>
 
+    <!-- OFX -->
     <section id="import">
       <div class="card">
-        <label for="ofx">Arquivo OFX</label>
+        <h3>Importar arquivo OFX (Santander/Bradesco)</h3>
+        <label for="ofx">Selecione o arquivo .ofx</label>
         <input id="ofx" type="file" accept=".ofx">
         <div class="actions">
           <button id="btnImportOfx" class="btn primary">Importar</button>
           <button id="btnExportTxs" class="btn">Exportar CSV</button>
         </div>
-        <p id="ofxStatus" class="small muted">Nenhum arquivo enviado.</p>
+        <p id="ofxStatus" class="muted">Nenhum arquivo enviado.</p>
       </div>
     </section>
 
+    <!-- LANÇAMENTOS -->
     <section id="txs">
       <div class="card">
         <table id="tblTxs">
           <thead><tr><th>Data</th><th>Desc</th><th>Valor</th><th>Tipo</th></tr></thead>
           <tbody></tbody>
         </table>
+        <div id="emptyTxs" class="empty" style="display:none">Sem lançamentos ainda. Importe OFX na aba “Importar OFX”.</div>
       </div>
     </section>
 
-    <section id="match">
-      <div class="card">
-        <p class="muted">Conciliação por valor e proximidade de data (MVP).</p>
-        <div class="actions"><button id="btnRunMatch" class="btn">Sugerir Matches</button></div>
-        <table id="tblMatch">
-          <thead><tr><th>Nota</th><th>Transação</th><th>Score</th></tr></thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </section>
-
+    <!-- RELATÓRIOS -->
     <section id="reports">
       <div class="card">
         <h3>Relatórios</h3>
         <div class="row">
-          <div><canvas id="chartMes" height="220"></canvas></div>
-          <div><canvas id="chartCat" height="220"></canvas></div>
+          <div><canvas id="chartMes" height="260"></canvas></div>
+          <div><canvas id="chartCat" height="260"></canvas></div>
         </div>
-        <p class="muted small">Dica: crie regras para classificar automaticamente (aba abaixo).</p>
-      </div>
-      <div class="card">
-        <h3>Regras de categorização</h3>
-        <div class="row">
-          <div><label>Padrão (regex)</label><input id="rulePattern" placeholder="mercado|super|carrefour"></div>
-          <div><label>Categoria</label><input id="ruleCat" placeholder="Supermercado"></div>
-        </div>
-        <div class="actions"><button id="btnAddRule" class="btn">Adicionar regra</button></div>
-        <table id="tblRules"><thead><tr><th>Padrão</th><th>Categoria</th><th></th></tr></thead><tbody></tbody></table>
+        <p class="muted">Dica: crie regras para classificar automaticamete (aba Config → Regras) e recarregue os relatórios.</p>
       </div>
     </section>
 
+    <!-- CONFIG -->
     <section id="settings">
       <div class="card">
+        <h3>Conexões & Preferências</h3>
         <label for="endpoint">Endpoint do Parser (Apps Script)</label>
         <input id="endpoint" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
         <label for="uf">UF padrão (ex.: MG, SP...)</label>
         <input id="uf" placeholder="MG">
+
+        <h3 style="margin-top:18px">Regras de categorização (regex)</h3>
+        <div class="row">
+          <div><label>Padrão</label><input id="rulePattern" placeholder="mercado|super|carrefour"></div>
+          <div><label>Categoria</label><input id="ruleCat" placeholder="Supermercado"></div>
+        </div>
         <div class="actions">
-          <button id="btnSaveCfg" class="btn primary">Salvar</button>
+          <button id="btnAddRule" class="btn">Adicionar regra</button>
+          <button id="btnSaveCfg" class="btn primary">Salvar Config</button>
           <button id="btnClearAll" class="btn">Apagar TUDO (local)</button>
         </div>
-        <p class="small muted">Dados locais. Para sincronizar em nuvem (Supabase), posso incluir depois sem custos.</p>
+        <table id="tblRules"><thead><tr><th>Padrão</th><th>Categoria</th><th></th></tr></thead><tbody></tbody></table>
+        <p class="muted">Dados salvos localmente (neste dispositivo). Podemos ativar sync depois (Supabase grátis).</p>
       </div>
     </section>
   </main>
 
+  <footer>© Zarya Finance</footer>
+
+  <!-- Bibliotecas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <!-- App scripts -->
   <script src="store.js"></script>
   <script src="ofx.js"></script>
   <script src="nfce.js"></script>
   <script src="main.js"></script>
-
 </body>
 </html>
