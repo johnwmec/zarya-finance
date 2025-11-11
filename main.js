@@ -1,5 +1,7 @@
 let currentStream = null;
 let detector = null;
+let zxingReader = null;
+let zxingRunning = false;
 
 function switchTab(id){
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===id));
@@ -13,6 +15,7 @@ async function ensureDetector(){
   else detector = null;
   return detector;
 }
+
 const video = document.getElementById('video');
 const scanStatus = document.getElementById('scanStatus');
 const result = document.getElementById('result');
@@ -20,18 +23,25 @@ const result = document.getElementById('result');
 async function startCam(){
   try{
     await ensureDetector();
-    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal:'environment' } }, audio: false });
     video.srcObject = currentStream; await video.play();
-    scanStatus.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (sem detector nativo; use foto/cole URL)';
-    if (detector) loopScan();
-  }catch(e){ scanStatus.textContent = 'Erro: '+e.message; }
+    scanStatus.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (ZXing)';
+    if (detector) loopScanNative(0);
+    else startZxing();
+  }catch(e){
+    scanStatus.textContent = 'Erro: '+e.message+' — ativando ZXing (fallback).';
+    startZxing();
+  }
 }
+
 function stopCam(){
+  if (zxingReader && zxingRunning){ try{ zxingReader.reset(); }catch(_){} zxingRunning=false; }
   if (currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; }
   scanStatus.textContent = 'Status: inativo';
 }
-async function loopScan(){
-  if (!detector || !video || video.readyState < 2) { requestAnimationFrame(loopScan); return; }
+
+async function loopScanNative(frameCount){
+  if (!detector || !video || video.readyState < 2){ requestAnimationFrame(()=>loopScanNative(frameCount)); return; }
   try{
     const bitmap = await createImageBitmap(video);
     const codes = await detector.detect(bitmap);
@@ -39,44 +49,90 @@ async function loopScan(){
       const raw = codes[0].rawValue; stopCam();
       result.textContent = 'QR detectado: '+raw+'\nProcessando...'; handleQr(raw); return;
     }
-  }catch(e){}
-  requestAnimationFrame(loopScan);
+  }catch(_){}
+  // se não achar em ~120 frames (~2s a 60fps), cai para ZXing
+  if (frameCount > 120){ startZxing(); return; }
+  requestAnimationFrame(()=>loopScanNative(frameCount+1));
 }
+
+function startZxing(){
+  if (zxingRunning) return;
+  try{
+    const ZX = window.ZXing || window.zxing || window;
+    if (!ZX || !ZX.BrowserQRCodeReader){ scanStatus.textContent = 'ZXing indisponível.'; return; }
+    zxingReader = new ZX.BrowserQRCodeReader();
+    zxingRunning = true;
+    // usa o elemento <video> existente
+    zxingReader.decodeFromVideoDevice(undefined, video, (res, err, controls)=>{
+      if (res && res.text){
+        const raw = res.text;
+        controls.stop(); zxingRunning=false; stopCam();
+        result.textContent = 'QR detectado: '+raw+'\nProcessando...'; handleQr(raw);
+      }
+    });
+    scanStatus.textContent = 'Status: ZXing ativo';
+  }catch(e){
+    scanStatus.textContent = 'Falha ZXing: '+e.message;
+  }
+}
+
 async function handleQr(url){
-  try{ const rec = await processNfceUrl(url);
+  try{
+    const rec = await processNfceUrl(url);
     result.textContent = 'OK! Nota salva:\n'+JSON.stringify(rec, null, 2);
     refreshReceiptsTable();
   }catch(e){ result.textContent = 'Falha: '+e.message; }
 }
-document.getElementById('btnStart')?.addEventListener('click', startCam);
-document.getElementById('btnStop')?.addEventListener('click', stopCam);
-document.getElementById('btnSnap')?.addEventListener('click', async ()=>{
+
+document.getElementById('btnStart').addEventListener('click', startCam);
+document.getElementById('btnStop').addEventListener('click', stopCam);
+
+// captura de imagem (fallback manual)
+document.getElementById('btnSnap').addEventListener('click', async ()=>{
   try{
     const input = document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
     input.onchange = async () => {
       const file = input.files[0]; if (!file) return;
-      if (!('BarcodeDetector' in window)){ result.textContent='Navegador sem detector nativo. Cole a URL do QR.'; return; }
       const blobUrl = URL.createObjectURL(file);
-      const img = new Image(); img.onload = async () => {
-        const bitmap = await createImageBitmap(img);
-        const codes = await detector.detect(bitmap); URL.revokeObjectURL(blobUrl);
-        if (codes && codes.length){ const raw = codes[0].rawValue; result.textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
-        else result.textContent = 'Nenhum QR detectado na imagem.';
-      }; img.src = blobUrl;
+      // se BarcodeDetector existir, tenta nele; se não, usa ZXing a partir de imagem
+      if (detector){
+        const img = new Image(); img.onload = async () => {
+          const bitmap = await createImageBitmap(img);
+          const codes = await detector.detect(bitmap); URL.revokeObjectURL(blobUrl);
+          if (codes && codes.length){ const raw = codes[0].rawValue; result.textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
+          else result.textContent = 'Nenhum QR detectado na imagem.';
+        }; img.src = blobUrl;
+      }else{
+        // ZXing com imagem (via decodeFromImageUrl)
+        const ZX = window.ZXing || window.zxing || window;
+        if (!ZX || !ZX.BrowserQRCodeReader){ result.textContent='ZXing indisponível'; return; }
+        const reader = new ZX.BrowserQRCodeReader();
+        try{
+          const res = await reader.decodeFromImageUrl(blobUrl);
+          URL.revokeObjectURL(blobUrl);
+          if (res && res.text){ result.textContent='QR detectado: '+res.text+'\nProcessando...'; handleQr(res.text); }
+          else result.textContent='Nenhum QR detectado na imagem.';
+        }catch(err){
+          URL.revokeObjectURL(blobUrl);
+          result.textContent='Falha ZXing imagem: '+(err && err.message? err.message : err);
+        }
+      }
     };
     input.click();
   }catch(e){ result.textContent = 'Erro ao capturar imagem: '+e.message; }
 });
-document.getElementById('btnProcessUrl')?.addEventListener('click', ()=>{
+
+// processar URL colada
+document.getElementById('btnProcessUrl').addEventListener('click', ()=>{
   const url = document.getElementById('qrUrl').value.trim();
   if (!url){ result.textContent = 'Informe a URL do QR.'; return; }
   handleQr(url);
 });
 
+// ---- Tabelas / Export ----
 function refreshReceiptsTable(){
   const arr = FinStore.loadReceipts();
   const tb = document.querySelector('#tblReceipts tbody');
-  if (!tb) return;
   tb.innerHTML = '';
   for (const r of arr){
     const tr = document.createElement('tr');
@@ -89,15 +145,15 @@ function refreshReceiptsTable(){
     tb.appendChild(tr);
   }
 }
-document.getElementById('btnRefreshReceipts')?.addEventListener('click', refreshReceiptsTable);
-document.getElementById('btnExportReceipts')?.addEventListener('click', ()=>{
+document.getElementById('btnRefreshReceipts').addEventListener('click', refreshReceiptsTable);
+document.getElementById('btnExportReceipts').addEventListener('click', ()=>{
   const arr = FinStore.loadReceipts();
   const rows = [['data','emitente','cnpj','valor','uf','chave','url','itens']];
   for (const r of arr){ rows.push([r.data, r.emitente, r.cnpj, r.valor, r.uf, r.chave, r.url, (r.itens||[]).length]); }
   exportCSV('receipts.csv', rows);
 });
 
-document.getElementById('btnImportOfx')?.addEventListener('click', async ()=>{
+document.getElementById('btnImportOfx').addEventListener('click', async ()=>{
   const f = document.getElementById('ofx').files[0];
   if (!f){ document.getElementById('ofxStatus').textContent = 'Nenhum arquivo selecionado.'; return; }
   const text = await f.text();
@@ -105,9 +161,9 @@ document.getElementById('btnImportOfx')?.addEventListener('click', async ()=>{
   const cur = FinStore.loadTxs();
   FinStore.saveTxs([...txs, ...cur]);
   document.getElementById('ofxStatus').textContent = `Importadas ${txs.length} transações.`;
-  refreshTxs();
+  refreshTxs(); renderReports();
 });
-document.getElementById('btnExportTxs')?.addEventListener('click', ()=>{
+document.getElementById('btnExportTxs').addEventListener('click', ()=>{
   const arr = FinStore.loadTxs();
   const rows = [['data','descricao','valor','tipo','categoria']];
   for (const t of arr){ rows.push([t.data, t.descricao, t.valor, t.tipo, categorize(t.descricao)]); }
@@ -116,7 +172,6 @@ document.getElementById('btnExportTxs')?.addEventListener('click', ()=>{
 function refreshTxs(){
   const arr = FinStore.loadTxs();
   const tb = document.querySelector('#tblTxs tbody');
-  if (!tb) return;
   tb.innerHTML = '';
   for (const t of arr){
     const tr = document.createElement('tr');
@@ -131,9 +186,8 @@ function refreshTxs(){
 // ----- RELATÓRIOS -----
 let chart1=null, chart2=null;
 function renderReports(){
-  const ctx1 = document.getElementById('chartMes')?.getContext('2d');
-  const ctx2 = document.getElementById('chartCat')?.getContext('2d');
-  if (!ctx1 || !ctx2) return;
+  const ctx1 = document.getElementById('chartMes').getContext('2d');
+  const ctx2 = document.getElementById('chartCat').getContext('2d');
   const txs = FinStore.loadTxs();
 
   const byMonth = {};
@@ -162,7 +216,7 @@ function renderReports(){
 }
 
 // ----- Regras -----
-document.getElementById('btnAddRule')?.addEventListener('click', ()=>{
+document.getElementById('btnAddRule').addEventListener('click', ()=>{
   const p = document.getElementById('rulePattern').value.trim();
   const c = document.getElementById('ruleCat').value.trim();
   if (!p || !c) return alert('Preencha padrão e categoria.');
@@ -175,7 +229,6 @@ document.getElementById('btnAddRule')?.addEventListener('click', ()=>{
 function renderRulesTable(){
   const rules = FinStore.loadRules();
   const tb = document.querySelector('#tblRules tbody');
-  if (!tb) return;
   tb.innerHTML = '';
   rules.forEach((r,idx)=>{
     const tr = document.createElement('tr');
@@ -190,16 +243,16 @@ function renderRulesTable(){
   }));
 }
 
-// ----- CONFIG (💡 faltava isso) -----
-document.getElementById('btnSaveCfg')?.addEventListener('click', ()=>{
+// ----- CONFIG (corrigido) -----
+document.getElementById('btnSaveCfg').addEventListener('click', ()=>{
+  const endpoint = document.getElementById('endpoint').value.trim();
+  const uf = document.getElementById('uf').value.trim() || 'MG';
   const cfg = FinStore.loadCfg();
-  cfg.endpoint = document.getElementById('endpoint').value.trim();
-  cfg.uf = (document.getElementById('uf').value||'').trim().toUpperCase();
+  cfg.endpoint = endpoint; cfg.uf = uf;
   FinStore.saveCfg(cfg);
-  alert('Configurações salvas.');
+  alert('Configurações salvas!');
 });
-
-document.getElementById('btnClearAll')?.addEventListener('click', ()=>{
+document.getElementById('btnClearAll').addEventListener('click', ()=>{
   if (!confirm('Apagar todos os dados locais?')) return;
   FinStore.wipe();
   refreshReceiptsTable(); refreshTxs(); renderRulesTable(); renderReports();
@@ -210,22 +263,6 @@ document.getElementById('btnClearAll')?.addEventListener('click', ()=>{
 function fmtDate(s){ const d = new Date(s); return isNaN(d)? s : d.toLocaleString(); }
 function esc(s){ return String(s).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
 
-// --- Handlers de Config ---
-document.getElementById('btnSaveCfg').addEventListener('click', ()=>{
-  const cfg = FinStore.loadCfg();
-  cfg.endpoint = (document.getElementById('endpoint').value || '').trim();
-  cfg.uf = (document.getElementById('uf').value || 'MG').trim().toUpperCase();
-  FinStore.saveCfg(cfg);
-  alert('Configurações salvas!');
-});
-
-document.getElementById('btnClearAll').addEventListener('click', ()=>{
-  if (confirm('Apagar TODOS os dados locais (config, notas e transações)?')) {
-    FinStore.wipe();
-    location.reload();
-  }
-});
-
 // init
 (function init(){
   const cfg = FinStore.loadCfg();
@@ -234,3 +271,4 @@ document.getElementById('btnClearAll').addEventListener('click', ()=>{
   if ('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }
   refreshReceiptsTable(); refreshTxs(); renderRulesTable();
 })();
+
