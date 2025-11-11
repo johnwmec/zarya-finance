@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b0b0b" />
-  <link rel="manifest" href="manifest.json?v=2.3.4" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b0b0b">
+  <link rel="manifest" href="manifest.json">
   <title>Zarya Finance</title>
   <style>
     :root{ --bg:#0a0a0a; --border:#2a2416; --text:#f6f4eb; --muted:#bdb6a3; --gold:#d4af37; --gold2:#c39a2b; --btn:#1a150b; --btnb:#3a2f16; --chip:#0f0d08; }
     *{box-sizing:border-box}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:linear-gradient(180deg,#090909,#0f0f0f);color:var(--text)}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;margin:0;background:linear-gradient(180deg,#090909,#0f0f0f);color:var(--text)}
     header{position:sticky;top:0;background:rgba(16,16,16,.85);backdrop-filter: blur(6px);border-bottom:1px solid var(--border);padding:14px 16px;z-index:10}
-    h1{font-size:18px;margin:0}
+    h1{font-size:18px;margin:0;letter-spacing:.3px}
     h1 .brand{color:var(--gold)}
     main{padding:16px;max-width:1040px;margin:0 auto}
     nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
@@ -19,63 +19,655 @@
     nav button.active{background:linear-gradient(180deg, rgba(212,175,55,.20), rgba(212,175,55,.08)); border-color:var(--gold2); color:#fff}
     section{display:none}
     section.active{display:block}
-    .card{background:linear-gradient(180deg,#131313,#0e0e0e);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px}
+    .card{background:linear-gradient(180deg,#131313,#0e0e0e);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 1px 0 rgba(212,175,55,.08), 0 8px 40px rgba(0,0,0,.25)}
+    label{display:block;margin:8px 0 6px}
+    input,textarea,select{width:100%;border:1px solid var(--border);background:#0d0d0d;color:var(--text);border-radius:10px;padding:10px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--border); padding:10px; text-align:left; font-size:14px}
+    th{color:#f0e6c0}
     .muted{opacity:.85;font-size:12px;color:var(--muted)}
-    #err{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);color:#ffb4b4;z-index:9999;padding:16px;overflow:auto;border-top:2px solid #b00020}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > *{flex:1 1 300px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .btn{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
+    .btn.primary{background:linear-gradient(180deg, rgba(212,175,55,.22), rgba(212,175,55,.1)); border-color:var(--gold2); color:#fff}
+    video{width:100%;max-height:360px;border-radius:14px;border:1px solid var(--border);background:#000}
+    .small{font-size:12px}
+    a{color:var(--gold)}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 2px}
+    .chip{background:var(--chip);border:1px solid var(--btnb);color:#d8c48a;border-radius:999px;padding:8px 12px;cursor:pointer}
+    #err{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);color:#ffb4b4;z-index:9999;padding:16px;overflow:auto;border-top:2px solid #b00020}
     #err pre{white-space:pre-wrap}
-    .boot{background:#111;border-bottom:1px solid var(--border);padding:8px 12px;color:#d8c48a;font-size:13px}
+    #boot{position:fixed;left:0;right:0;top:0;padding:8px 12px;background:#111;color:#ddd;border-bottom:1px solid #333;font-size:12px;z-index:9998}
+    #ping{position:fixed;right:8px;bottom:8px;background:#111;border:1px solid #333;padding:6px 10px;border-radius:10px;font-size:12px}
   </style>
 </head>
 <body>
-  <div class="boot">Zarya Finance 2.3.4 — carregando scripts… Se ficar só nisso, clique em <a href="#" id="panic">forçar atualização</a>.</div>
+  <div id="boot">Zarya Finance v2.4.2 — carregando…</div>
   <div id="err"><strong>Erro de execução no app</strong><pre id="errlog"></pre><button onclick="this.parentElement.style.display='none'">Fechar</button></div>
   <header><h1><span class="brand">Zarya Finance</span> • NFC-e + OFX (PWA)</h1></header>
   <main>
     <nav>
       <button data-tab="scan" class="active">Scanner NFC-e</button>
       <button data-tab="receipts">Notas</button>
+      <button data-tab="import">Importar OFX</button>
+      <button data-tab="txs">Lançamentos</button>
+      <button data-tab="reports">Relatórios</button>
       <button data-tab="settings">Config</button>
       <button data-tab="debug">Diagnóstico</button>
     </nav>
+
+    <div class="card">
+      <div class="chips">
+        <span class="chip" id="chipMonth">Mês atual</span>
+        <span class="chip" id="chip30">Últimos 30 dias</span>
+        <span class="chip" id="chipYear">Ano atual</span>
+      </div>
+      <span class="muted small">Filtros de período afetam Tabelas e Relatórios.</span>
+    </div>
+
     <section id="scan" class="active">
       <div class="card">
-        <p class="muted">Teste rápido: se você vê esta seção, o HTML carregou. Abaixo, os scripts mostrarão o status.</p>
-        <p id="bootStatus" class="muted">Scripts ainda iniciando…</p>
+        <p class="muted">Use a câmera para ler o QR da NFC-e. Se o navegador não suportar, fotografe o QR, use o <b>Leitor alternativo</b> (ZXing) ou cole a URL.</p>
+        <div class="row">
+          <div>
+            <video id="video" playsinline></video>
+            <div class="actions">
+              <button id="btnStart" class="btn primary">Iniciar câmera (traseira)</button>
+              <button id="btnSwitchCam" class="btn">Trocar câmera</button>
+              <button id="btnStop" class="btn">Parar</button>
+              <button id="btnZXing" class="btn">Leitor alternativo (ZXing)</button>
+              <button id="btnSnap" class="btn">Ler de foto</button>
+            </div>
+            <p id="scanStatus" class="small muted">Status: inativo</p>
+          </div>
+          <div>
+            <label for="qrUrl">Ou cole a URL do QR Code</label>
+            <input id="qrUrl" placeholder="https://…">
+            <div class="actions">
+              <button id="btnProcessUrl" class="btn">Processar URL</button>
+            </div>
+            <p class="small muted">Dica: aponte a câmera nativa do iPhone para o QR e copie a URL que aparecer.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card"><h3>Resultado</h3><pre id="result" class="small"></pre></div>
+    </section>
+
+    <section id="receipts">
+      <div class="card">
+        <div class="actions">
+          <button id="btnRefreshReceipts" class="btn">Atualizar</button>
+          <button id="btnExportReceipts" class="btn">Exportar CSV</button>
+        </div>
+        <table id="tblReceipts">
+          <thead><tr><th>Data</th><th>Emitente</th><th>Valor</th><th>Itens</th><th>UF</th></tr></thead>
+          <tbody></tbody>
+        </table>
       </div>
     </section>
-    <section id="receipts"><div class="card"><p>Notas (placeholder)</p></div></section>
-    <section id="settings"><div class="card"><p>Config (placeholder)</p></div></section>
-    <section id="debug"><div class="card"><p>Diagnóstico (placeholder)</p><input id="dbgUrl" placeholder="https://..."><button id="btnDbgTest">Testar</button><pre id="dbgOut"></pre></div></section>
+
+    <section id="import">
+      <div class="card">
+        <label for="ofx">Arquivo OFX (Santander/Bradesco)</label>
+        <input id="ofx" type="file" accept=".ofx">
+        <div class="actions">
+          <button id="btnImportOfx" class="btn primary">Importar</button>
+          <button id="btnExportTxs" class="btn">Exportar CSV</button>
+        </div>
+        <p id="ofxStatus" class="small muted">Nenhum arquivo enviado.</p>
+      </div>
+    </section>
+
+    <section id="txs">
+      <div class="card">
+        <table id="tblTxs">
+          <thead><tr><th>Data</th><th>Desc</th><th>Valor</th><th>Tipo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reports">
+      <div class="card">
+        <h3>Relatórios</h3>
+        <div class="row">
+          <div><canvas id="chartMes" height="220"></canvas></div>
+          <div><canvas id="chartCat" height="220"></canvas></div>
+        </div>
+        <p class="muted small">Crie regras para classificar automaticamente (aba Config).</p>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="card">
+        <h3>Configurações</h3>
+        <label for="endpoint">Endpoint do Parser (Apps Script) — opcional</label>
+        <input id="endpoint" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+        <label>Modo do Parser</label>
+        <div class="row">
+          <label><input type="radio" name="parserMode" value="apps"> Apps Script</label>
+          <label><input type="radio" name="parserMode" value="proxy" checked> Proxy Público (r.jina.ai)</label>
+        </div>
+        <label for="uf">UF padrão</label>
+        <input id="uf" placeholder="MG">
+        <div class="actions">
+          <button id="btnSaveCfg" class="btn primary">Salvar</button>
+          <button id="btnClearAll" class="btn">Apagar TUDO (local)</button>
+        </div>
+        <p id="cfgStatus" class="small muted"></p>
+      </div>
+
+      <div class="card">
+        <h3>Regras de categorização</h3>
+        <div class="row">
+          <div><label>Padrão (regex)</label><input id="rulePattern" placeholder="mercado|super|carrefour"></div>
+          <div><label>Categoria</label><input id="ruleCat" placeholder="Supermercado"></div>
+        </div>
+        <div class="actions"><button id="btnAddRule" class="btn">Adicionar regra</button></div>
+        <table id="tblRules"><thead><tr><th>Padrão</th><th>Categoria</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <section id="debug">
+      <div class="card">
+        <h3>Diagnóstico do Parser</h3>
+        <p class="small muted">Cole a URL da NFC-e abaixo e clique em <b>Testar</b> para ver o que o parser leu (sem salvar).</p>
+        <div class="row">
+          <div><input id="dbgUrl" placeholder="https://..."></div>
+        </div>
+        <div class="actions">
+          <button id="btnDbgTest" class="btn">Testar</button>
+        </div>
+        <pre id="dbgOut" class="small"></pre>
+      </div>
+    </section>
   </main>
 
+  <div id="ping">Ping de interação: <span id="pingVal">—</span></div>
+
+  <noscript>Ative o JavaScript para usar o Zarya Finance.</noscript>
+
+  <!-- Error overlay (sempre primeiro) -->
   <script>
     (function(){
       function showErr(msg, src, ln, col, err){
         var el=document.getElementById('err'); var pre=document.getElementById('errlog');
-        if(!el||!pre) return;
-        pre.textContent = (msg||'') + '\\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err?'\\n'+(err.stack||err):'');
+        if(!el||!pre){ alert(msg); return; }
+        pre.textContent = (msg||'') + '\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err ? '\n' + (err.stack||err) : '');
         el.style.display='block';
       }
       window.addEventListener('error', function(e){ showErr(e.message, e.filename, e.lineno, e.colno, e.error); });
-      window.addEventListener('unhandledrejection', function(e){ showErr('Unhandled: '+(e.reason && e.reason.message || e.reason), '', '', '', e.reason); });
-      document.getElementById('panic').addEventListener('click', async (ev)=>{
-        ev.preventDefault();
-        if ('serviceWorker' in navigator){
-          const regs = await navigator.serviceWorker.getRegistrations();
-          for (const r of regs){ await r.unregister(); }
-        }
-        if ('caches' in window){
-          const keys = await caches.keys();
-          for (const k of keys){ await caches.delete(k); }
-        }
-        location.href = location.pathname + '?clean=' + Date.now();
-      });
-      if ('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js?v=2.3.4').catch(()=>{}); }
+      window.addEventListener('unhandledrejection', function(e){ showErr('Unhandled: ' + (e.reason && e.reason.message || e.reason), '', '', '', e.reason); });
     })();
   </script>
 
-  <script defer src="store.js?v=2.3.4"></script>
-  <script defer src="nfce.js?v=2.3.4"></script>
-  <script defer src="main.js?v=2.3.4"></script>
+  <!-- ZXing e Chart.js (únicos externos) -->
+  <script src="https://unpkg.com/@zxing/library@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- store.js inline -->
+  <script>
+    const FinStore = {
+      cfgKey: 'finapp_cfg_v2', recKey: 'finapp_receipts_v2', txKey:  'finapp_txs_v2', rulesKey: 'finapp_rules_v2',
+      loadCfg(){ try{ return JSON.parse(localStorage.getItem(this.cfgKey)||'{}'); }catch(e){ return {}; } },
+      saveCfg(cfg){ localStorage.setItem(this.cfgKey, JSON.stringify(cfg||{})); },
+      loadReceipts(){ try{ return JSON.parse(localStorage.getItem(this.recKey)||'[]'); }catch(e){ return []; } },
+      saveReceipts(a){ localStorage.setItem(this.recKey, JSON.stringify(a||[])); },
+      loadTxs(){ try{ return JSON.parse(localStorage.getItem(this.txKey)||'[]'); }catch(e){ return []; } },
+      saveTxs(a){ localStorage.setItem(this.txKey, JSON.stringify(a||[])); } ,
+      loadRules(){ try{ return JSON.parse(localStorage.getItem(this.rulesKey)||'[]'); }catch(e){ return []; } },
+      saveRules(a){ localStorage.setItem(this.rulesKey, JSON.stringify(a||[])); },
+      wipe(){ try{ localStorage.removeItem('finapp_cfg_v2'); localStorage.removeItem('finapp_receipts_v2'); localStorage.removeItem('finapp_txs_v2'); localStorage.removeItem('finapp_rules_v2'); }catch(e){} }
+    };
+    function inPeriod(dateISO, period){
+      const d = new Date(dateISO); if (isNaN(d)) return false;
+      const now = new Date(); let start = null;
+      if (period.mode==='custom'){ const s=new Date(period.start), e=new Date(period.end||now); return d>=s && d<=e; }
+      if (period.mode==='last30'){ start=new Date(now); start.setDate(start.getDate()-30); }
+      else if (period.mode==='year'){ start=new Date(now.getFullYear(),0,1); }
+      else { start=new Date(now.getFullYear(), now.getMonth(), 1); }
+      return d>=start && d<=now;
+    }
+    function exportCSV(filename, rows){
+      const esc = (v)=>('"' + String(v).replace(/"/g,'""') + '"');
+      const csv = rows.map(r=>r.map(esc).join(',')).join('\n');
+      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+      setTimeout(()=>URL.revokeObjectURL(url), 1500);
+    }
+    function categorize(text){
+      const rules = FinStore.loadRules();
+      for (const r of rules){ try{ const re = new RegExp(r.pattern,'i'); if (re.test(text||'')) return r.categoria; }catch(e){} }
+      return 'Sem categoria';
+    }
+  </script>
+
+  <!-- ofx.js inline -->
+  <script>
+    async function parseOFX(text){
+      const txs = []; const lines = text.split(/\r?\n/); let cur = {};
+      for (let raw of lines){
+        const line = raw.trim();
+        if (line.startsWith('<STMTTRN>')) cur = {};
+        else if (line.startsWith('<TRNTYPE>')) cur.tipo = line.substring(9).toUpperCase().includes('DEBIT')?'DEBITO':'CREDITO';
+        else if (line.startsWith('<DTPOSTED>')) cur.data = line.substring(10);
+        else if (line.startsWith('<TRNAMT>')) cur.valor = parseFloat(line.substring(8));
+        else if (line.startsWith('<MEMO>')) cur.descricao = line.substring(6);
+        else if (line.startsWith('</STMTTRN>')) { const iso = ofxDateToISO(cur.data); txs.push({ data: iso, descricao: cur.descricao||'', valor: cur.valor||0, tipo: cur.tipo||'DEBITO' }); cur = {}; }
+      }
+      return txs;
+    }
+    function ofxDateToISO(s){ if (!s) return null; const y=s.slice(0,4),m=s.slice(4,6),d=s.slice(6,8),hh=s.slice(8,10)||'00',mm=s.slice(10,12)||'00',ss=s.slice(12,14)||'00'; return y+'-'+m+'-'+d+'T'+hh+':'+mm+':'+ss; }
+  </script>
+
+  <!-- nfce.js inline -->
+  <script>
+    (function(){
+      function clean(s){ return String(s||'').replace(/\s+/g,' ').replace(/\u00A0/g,' ').trim(); }
+      function brToNumber(txt){
+        if (txt == null) return null;
+        const s = String(txt).replace(/\u00A0/g,' ').trim();
+        if (!s) return null;
+        const cleaned = s.replace(/[R$\s]/gi,'');
+        const n = cleaned.replace(/\./g,'').replace(',', '.');
+        const v = parseFloat(n);
+        return isNaN(v) ? null : v;
+      }
+      function toISO(dateStr, timeStr){
+        if (!dateStr) return new Date().toISOString();
+        const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(dateStr);
+        if (!m) return new Date().toISOString();
+        var d=m[1], mo=m[2], y=m[3];
+        var hh='00', mm='00', ss='00';
+        if (timeStr){
+          const t = /(\d{2}):(\d{2})(?::(\d{2}))?/.exec(timeStr);
+          if (t){ hh=t[1]; mm=t[2]; ss=t[3]||'00'; }
+        }
+        return y+'-'+mo+'-'+d+'T'+hh+':'+mm+':'+ss;
+      }
+      async function fetchViaProxy(nfceUrl){
+        const proxied = 'https://r.jina.ai/http://' + nfceUrl.replace(/^https?:\/\//i,'').replace(/^\/\//,'');
+        const resp = await fetch(proxied);
+        if (!resp.ok) throw new Error('Proxy falhou ('+resp.status+')');
+        return await resp.text();
+      }
+      async function fetchViaAppsScript(nfceUrl){
+        var cfg = (window.FinStore && FinStore.loadCfg && FinStore.loadCfg()) || {};
+        if(!cfg.endpoint) throw new Error('Defina o endpoint do Apps Script em Config.');
+        try{
+          const resp = await fetch(cfg.endpoint, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ url: nfceUrl, v:3, raw:true }) });
+          if (!resp.ok) throw new Error('Falha no parser ('+resp.status+')');
+          return await resp.text();
+        }catch(e){
+          const sep = cfg.endpoint.indexOf('?')>=0 ? '&' : '?';
+          const resp = await fetch(cfg.endpoint + sep + 'url=' + encodeURIComponent(nfceUrl) + '&v=3&raw=true');
+          if (!resp.ok) throw new Error('Falha no parser GET ('+resp.status+')');
+          return await resp.text();
+        }
+      }
+      function parseWithDOM(html, url){
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        var emitente='', cnpj='', documento='';
+        const allRows = Array.from(doc.querySelectorAll('table tr'));
+        for(const tr of allRows){
+          const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
+          if (tds.length>=2){
+            if (!emitente && /raz[aã]o social|emitente|nome\/raza[oã]/i.test(tds[0])) emitente = tds[1];
+            if (!cnpj && /cnpj/i.test(tds[0])) cnpj = tds[1].replace(/\D+/g,'');
+            if (!documento && /(cpf.*consumidor|cpf\/cnpj.*consumidor|cpf do consumidor)/i.test(tds[0])) documento = tds[1];
+            if (!emitente && /raz[aã]o social|emitente|nome\/raza[oã]/i.test(tds[1])) emitente = tds[0];
+            if (!cnpj && /cnpj/i.test(tds[1])) cnpj = tds[0].replace(/\D+/g,'');
+          }
+        }
+        if (!emitente){
+          const topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente');
+          emitente = clean(topo && topo.textContent || '');
+        }
+        var dataBR = '', hora = '';
+        const labels = ['Data de Emissão','Data/Hora da Emissão','Emissão'];
+        for (const tr of allRows){
+          const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
+          if (tds.length>=2){
+            if (labels.some(function(l){ return tds[0].indexOf(l)>=0; })){
+              const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(tds[1]);
+              const hm = /(\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/.exec(tds[1]);
+              if (dm) dataBR = dm[1];
+              if (hm) hora = hm[1];
+            }
+          }
+        }
+        if (!dataBR){
+          const m = /Data\/Hora da Emiss[aã]o[^<]*>\s*([^<]+)/i.exec(html);
+          if (m){ const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(m[1]); const hm = /(\d{2}:\d{2}(:\d{2})?)/.exec(m[1]); dataBR = dm?dm[1]:''; hora = hm?hm[1]:''; }
+        }
+        const dataISO = toISO(dataBR, hora);
+        var valorTotal = null;
+        for (const tr of allRows){
+          const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
+          if (tds.length>=2 && /valor\s*(total|a pagar)/i.test(tds[0])){ valorTotal = brToNumber(tds[1]); break; }
+        }
+        if (valorTotal==null){
+          const nodes = Array.from(doc.querySelectorAll('td, span, div')).map(function(e){ return clean(e.textContent); });
+          const totalSpan = nodes.find(function(t){ return /^total\s*r\$/i.test(t); });
+          if (totalSpan){ const num = totalSpan.replace(/[^0-9\.,]/g,''); valorTotal = brToNumber(num); }
+        }
+        if (valorTotal==null) valorTotal = 0;
+        const items = [];
+        const tables = Array.from(doc.querySelectorAll('table'));
+        for (const table of tables){
+          const headers = Array.from(table.querySelectorAll('th')).map(function(th){ return clean(th.textContent); });
+          if (headers.length){
+            const hasDesc = headers.some(function(h){ return /descri[cç][aã]o|produto/i.test(h); });
+            const hasVTotal = headers.some(function(h){ return /valor\s*total|vl\.?\s*total/i.test(h); });
+            if (hasDesc && hasVTotal){
+              const trs = Array.from(table.querySelectorAll('tr'));
+              for (const tr of trs.slice(1)){
+                const cells = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.textContent); });
+                if (cells.length<2) continue;
+                const desc = cells[0]; if (!desc || /\bdescri[cç][aã]o\b/i.test(desc)) continue;
+                var qtd = null, un = '', vun = null, vtot = null;
+                headers.forEach(function(h,idx){
+                  const val = cells[idx] || '';
+                  if (/qtde|quantidade/i.test(h)) qtd = brToNumber(val);
+                  if (/unidade|un\b|und/i.test(h)) un = val;
+                  if (/valor\s*unit|vl\.?\s*unit/i.test(h)) vun = brToNumber(val);
+                  if (/valor\s*total|vl\.?\s*total/i.test(h)) vtot = brToNumber(val);
+                });
+                if (vtot==null){ const lastNum = cells.slice().reverse().find(function(c){ return /[\d\.,]/.test(c); }); vtot = brToNumber(lastNum); }
+                if (qtd==null){ const n = cells.find(function(c){ return /^\d+([\.,]\d+)?$/.test(c); }); qtd = brToNumber(n)||1; }
+                if (!un){ const u = cells.find(function(c){ return /^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c); }); un = u||''; }
+                if (vun==null && vtot!=null && qtd){ vun = (vtot && qtd)? (vtot/qtd) : null; }
+                if (desc && vtot!=null && vtot>0) items.push({ descricao: desc, quantidade: qtd||1, unidade: un||'', valor_unitario: vun, valor_total: vtot });
+              }
+            }
+          }
+        }
+        if (items.length===0){
+          const rows = Array.from(doc.querySelectorAll('tr.fixo-prod-serv, .linha-produto, .prod, [role="row"]'));
+          for (const row of rows){
+            const cells = Array.from(row.querySelectorAll('td, [role="cell"]')).map(function(e){ return clean(e.textContent); });
+            if (cells.length<3) continue;
+            const desc = cells[0];
+            const vtot = brToNumber(cells[cells.length-1]);
+            const qtd = brToNumber(cells.find(function(c){ return /^\d+([\.,]\d+)?$/.test(c); })) || 1;
+            const un = (cells.find(function(c){ return /^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c); }) || '');
+            const vun = (vtot && qtd) ? vtot/qtd : null;
+            if (desc && vtot) items.push({ descricao: desc, quantidade: qtd, unidade: un, valor_unitario: vun, valor_total: vtot });
+          }
+        }
+        const ufm = /\/\/(\w{2})\./i.exec(url); const uf = ufm && ufm[1] ? ufm[1].toUpperCase() : '';
+        const chm = ( /chNFe=([\d]{44})/i.exec(url) || /p=([\d]{44})/i.exec(url) ); const chave = chm ? chm[1] : '';
+        return { emitente: emitente, cnpj: (cnpj||'').replace(/\D+/g,''), documento: documento, data: dataISO, data_br: dataBR, hora: hora, uf: uf, chave: chave, valor: valorTotal, items: items };
+      }
+      async function getHtml(url){
+        var cfg = (window.FinStore && FinStore.loadCfg && FinStore.loadCfg()) || {};
+        if (cfg.parserMode==='proxy' || !cfg.endpoint){ try{ return await fetchViaProxy(url); }catch(e){ return await fetchViaAppsScript(url); } }
+        try{ return await fetchViaAppsScript(url); }catch(e){ return await fetchViaProxy(url); }
+      }
+      async function processNfceUrl(url){
+        const html = await getHtml(url);
+        const data = parseWithDOM(html, url);
+        const arr = (window.FinStore && FinStore.loadReceipts ? FinStore.loadReceipts() : []) || [];
+        arr.unshift({ id: (crypto.randomUUID?crypto.randomUUID():String(Date.now())), emitente: data.emitente||'', cnpj: data.cnpj||'', documento: data.documento||'', data: data.data || new Date().toISOString(), valor: data.valor||0, uf: data.uf||'', chave: data.chave||'', url: url, itens: data.items||[] });
+        if (window.FinStore && FinStore.saveReceipts) FinStore.saveReceipts(arr);
+        return arr[0];
+      }
+      async function debug(url){
+        const html = await getHtml(url);
+        return parseWithDOM(html, url);
+      }
+      window.NFCE = { processNfceUrl: processNfceUrl, debug: debug };
+    })();
+  </script>
+
+  <!-- main.js inline -->
+  <script>
+    (function(){
+      var pingValEl = null;
+      function setPing(msg){ if (!pingValEl) pingValEl = document.getElementById('pingVal'); if (pingValEl) pingValEl.textContent = msg; }
+
+      document.addEventListener('click', function(){ setPing(new Date().toLocaleTimeString()); });
+
+      document.addEventListener('DOMContentLoaded', function(){
+        try{
+          var boot = document.getElementById('boot'); if (boot) boot.textContent = 'Zarya Finance v2.4.2 — pronto';
+          var currentStream=null, currentDeviceId=null, detector=null, zxingReader=null;
+          var period = { mode:'month', start:null, end:null };
+
+          function switchTab(id){
+            var tabs = document.querySelectorAll('nav button'); for (var i=0;i<tabs.length;i++){ tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab')===id); }
+            var secs = document.querySelectorAll('main section'); for (var j=0;j<secs.length;j++){ secs[j].classList.toggle('active', secs[j].id===id); }
+            if (id==='reports') renderReports();
+          }
+          document.addEventListener('click', function(e){
+            var t=e.target;
+            if (t.matches && t.matches('nav button')) switchTab(t.getAttribute('data-tab'));
+            if (t.id==='chipMonth'){ period.mode='month'; refreshAll(); }
+            if (t.id==='chip30'){ period.mode='last30'; refreshAll(); }
+            if (t.id==='chipYear'){ period.mode='year'; refreshAll(); }
+          });
+
+          function ensureDetector(){ if ('BarcodeDetector' in window){ detector = new BarcodeDetector({ formats: ['qr_code'] }); } else detector=null; return detector; }
+          function video(){ return document.getElementById('video'); }
+          function scanStatus(){ return document.getElementById('scanStatus'); }
+          function result(){ return document.getElementById('result'); }
+          function esc(s){
+            var map = {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"};
+            return String(s).replace(/[&<>"]/g, function(ch){ return map[ch]; }).replace(/'/g,"&#39;");
+          }
+          function fmtDate(s){ var d=new Date(s); return isNaN(d)? s : d.toLocaleString(); }
+
+          function listCameras(){ return navigator.mediaDevices.enumerateDevices().then(function(d){ return d.filter(function(x){ return x.kind==='videoinput'; }); }); }
+          function stopCam(){ if (currentStream){ currentStream.getTracks().forEach(function(t){ t.stop(); }); currentStream=null; } var st=scanStatus(); if (st) st.textContent='Status: inativo'; }
+
+          function loopScan(){
+            var v=video(); if (!detector || !v || v.readyState<2){ requestAnimationFrame(loopScan); return; }
+            createImageBitmap(v).then(function(bmp){
+              detector.detect(bmp).then(function(codes){
+                if (codes && codes.length){ var raw=codes[0].rawValue; stopCam(); if (result()) result().textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
+                else requestAnimationFrame(loopScan);
+              }).catch(function(){ requestAnimationFrame(loopScan); });
+            }).catch(function(){ requestAnimationFrame(loopScan); });
+          }
+
+          function startCam(preferBack){
+            if (preferBack===undefined) preferBack=true;
+            ensureDetector();
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: preferBack?{ideal:'environment'}:{ideal:'user'} }, audio:false }).then(function(stream){
+              currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play().then(function(){
+                listCameras().then(function(cams){
+                  var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); });
+                  if (back && preferBack){ switchToDevice(back.deviceId); }
+                });
+                var st=scanStatus(); if (st) st.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (sem detector nativo; use Leitor Alternativo)';
+                if (detector) loopScan();
+              });
+            }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro: '+e.message; });
+          }
+
+          function switchToDevice(deviceId){
+            stopCam(); currentDeviceId=deviceId;
+            navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio:false }).then(function(stream){
+              currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play();
+            }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro ao trocar câmera: '+e.message; });
+          }
+
+          function startZXing(){
+            try{
+              var ZX = window.ZXing; if (!ZX) throw new Error('Biblioteca ZXing não carregou');
+              var Reader = ZX.BrowserMultiFormatReader;
+              zxingReader = new Reader();
+              zxingReader.listVideoInputDevices().then(function(cams){
+                var deviceId = cams[0] && cams[0].deviceId; var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); }); if (back) deviceId=back.deviceId;
+                var v=video(); if (!v) return;
+                zxingReader.decodeFromVideoDevice(deviceId, v, function(res,err){
+                  if (res){ zxingReader.reset(); stopCam(); if (result()) result().textContent='QR detectado: '+res.getText()+'\nProcessando...'; handleQr(res.getText()); }
+                });
+                var st=scanStatus(); if (st) st.textContent='ZXing: leitor alternativo ativo';
+              });
+            }catch(e){ var st=scanStatus(); if (st) st.textContent='ZXing erro: '+e.message; }
+          }
+
+          var btnStart = document.getElementById('btnStart');
+          var btnSwitch = document.getElementById('btnSwitchCam');
+          var btnZXing = document.getElementById('btnZXing');
+          var btnStop = document.getElementById('btnStop');
+          var btnSnap = document.getElementById('btnSnap');
+          var btnProcessUrl = document.getElementById('btnProcessUrl');
+          if (btnStart) btnStart.addEventListener('click', function(){ startCam(true); });
+          if (btnSwitch) btnSwitch.addEventListener('click', function(){
+            listCameras().then(function(cams){ if (!cams.length) return alert('Nenhuma câmera encontrada'); var idx = cams.findIndex(function(c){ return c.deviceId===currentDeviceId; }); var next = cams[(idx+1+cams.length)%cams.length]; switchToDevice(next.deviceId); });
+          });
+          if (btnZXing) btnZXing.addEventListener('click', startZXing);
+          if (btnStop) btnStop.addEventListener('click', stopCam);
+          if (btnSnap) btnSnap.addEventListener('click', function(){
+            var input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
+            input.onchange=function(){ var file=input.files[0]; if (!file) return;
+              var blobUrl=URL.createObjectURL(file); var img=new Image(); img.onload=function(){
+                try{
+                  var ZX = window.ZXing; if (ZX){
+                    var Reader = ZX.BrowserMultiFormatReader;
+                    var r = new Reader();
+                    var canvas=document.createElement('canvas'); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
+                    var ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+                    try{ var ls=r.createLuminanceSource(canvas,0,0,canvas.width,canvas.height); var bb=r.createBinaryBitmap(ls); var res=r.decodeBinaryBitmap(bb); if (res){ if (result()) result().textContent='QR detectado: '+res.getText()+'\nProcessando...'; handleQr(res.getText()); URL.revokeObjectURL(blobUrl); return; } }catch(err){}
+                  }
+                  if (!('BarcodeDetector' in window)){ if (result()) result().textContent='Sem ZXing e sem detector nativo. Cole a URL do QR.'; URL.revokeObjectURL(blobUrl); return; }
+                  createImageBitmap(img).then(function(bitmap){ detector.detect(bitmap).then(function(codes){
+                    URL.revokeObjectURL(blobUrl);
+                    if (codes && codes.length){ var raw=codes[0].rawValue; if (result()) result().textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
+                    else if (result()) result().textContent='Nenhum QR detectado na imagem.';
+                  }); });
+                }catch(e){ if (result()) result().textContent='Erro: '+e.message; }
+              }; img.src=blobUrl;
+            };
+            input.click();
+          });
+          if (btnProcessUrl) btnProcessUrl.addEventListener('click', function(){
+            var q = document.getElementById('qrUrl').value.trim(); if (!q){ if (result()) result().textContent='Informe a URL do QR.'; return; } handleQr(q);
+          });
+
+          function handleQr(url){
+            window.NFCE.processNfceUrl(url).then(function(rec){
+              if (result()) result().textContent='OK! Nota salva:\n'+JSON.stringify(rec,null,2); refreshReceiptsTable();
+            }).catch(function(e){ if (result()) result().textContent='Falha: '+e.message; });
+          }
+
+          // DEBUG
+          var dbgBtn = document.getElementById('btnDbgTest');
+          if (dbgBtn) dbgBtn.addEventListener('click', function(){
+            var url = (document.getElementById('dbgUrl') && document.getElementById('dbgUrl').value || '').trim();
+            var outEl = document.getElementById('dbgOut');
+            if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
+            window.NFCE.debug(url).then(function(data){
+              if (outEl) outEl.textContent = JSON.stringify(data, null, 2).slice(0, 40000);
+            }).catch(function(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; });
+          });
+
+          // CONFIG
+          var btnSaveCfg = document.getElementById('btnSaveCfg');
+          var btnClearAll = document.getElementById('btnClearAll');
+          if (btnSaveCfg) btnSaveCfg.addEventListener('click', function(){
+            var endpoint=document.getElementById('endpoint').value.trim(); var uf=document.getElementById('uf').value.trim();
+            var mode=(document.querySelector('input[name="parserMode"]:checked') && document.querySelector('input[name="parserMode"]:checked').value) || 'proxy';
+            var cfg=FinStore.loadCfg(); cfg.endpoint=endpoint; cfg.uf=uf; cfg.parserMode=mode; FinStore.saveCfg(cfg);
+            var s=document.getElementById('cfgStatus'); if (s) s.textContent='Configurações salvas.';
+          });
+          if (btnClearAll) btnClearAll.addEventListener('click', function(){
+            if(!confirm('Apagar todos os dados locais?')) return; FinStore.wipe();
+            var s=document.getElementById('cfgStatus'); if (s) s.textContent='Dados limpos.'; refreshAll();
+          });
+          var btnAddRule = document.getElementById('btnAddRule');
+          if (btnAddRule) btnAddRule.addEventListener('click', function(){
+            var p=document.getElementById('rulePattern').value.trim(); var c=document.getElementById('ruleCat').value.trim(); if(!p||!c) return alert('Preencha padrão e categoria.');
+            var rules=FinStore.loadRules(); rules.unshift({pattern:p, categoria:c}); FinStore.saveRules(rules); document.getElementById('rulePattern').value=''; document.getElementById('ruleCat').value=''; renderRulesTable(); renderReports();
+          });
+
+          function refreshReceiptsTable(){
+            var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
+            var tb=document.querySelector('#tblReceipts tbody'); if (!tb) return; tb.innerHTML='';
+            for (var i=0;i<arr.length;i++){
+              var r=arr[i];
+              var tr=document.createElement('tr');
+              tr.innerHTML='<td>'+fmtDate(r.data)+'</td><td>'+esc(r.emitente||'')+'</td><td>R$ '+Number(r.valor||0).toFixed(2)+'</td><td>'+((r.itens||[]).length)+'</td><td>'+(r.uf||'')+'</td>';
+              tb.appendChild(tr);
+            }
+          }
+          var btnRefRec = document.getElementById('btnRefreshReceipts');
+          var btnExpRec = document.getElementById('btnExportReceipts');
+          if (btnRefRec) btnRefRec.addEventListener('click', refreshReceiptsTable);
+          if (btnExpRec) btnExpRec.addEventListener('click', function(){
+            var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
+            var rows=[['data','emitente','cnpj','documento','valor','uf','chave','url','itens']];
+            for (var i=0;i<arr.length;i++){ var r=arr[i]; rows.push([r.data,r.emitente,r.cnpj,r.documento||'',r.valor,r.uf,r.chave,r.url,(r.itens||[]).length]); }
+            exportCSV('receipts.csv', rows);
+          });
+
+          function refreshTxs(){
+            var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var tb=document.querySelector('#tblTxs tbody'); if(!tb) return; tb.innerHTML='';
+            for (var i=0;i<arr.length;i++){ var t=arr[i]; var tr=document.createElement('tr'); tr.innerHTML='<td>'+fmtDate(t.data)+'</td><td>'+esc(t.descricao||'')+'</td><td>R$ '+Number(t.valor||0).toFixed(2)+'</td><td>'+t.tipo||''+'</td>'; tb.appendChild(tr); }
+          }
+          var btnImp = document.getElementById('btnImportOfx');
+          var btnExpTxs = document.getElementById('btnExportTxs');
+          if (btnImp) btnImp.addEventListener('click', function(){
+            var f=document.getElementById('ofx').files[0]; var st=document.getElementById('ofxStatus'); if(!f){ if(st) st.textContent='Nenhum arquivo selecionado.'; return; }
+            f.text().then(function(text){
+              parseOFX(text).then(function(txs){
+                var cur=FinStore.loadTxs(); FinStore.saveTxs(txs.concat(cur));
+                if(st) st.textContent='Importadas '+txs.length+' transações.'; refreshTxs();
+              });
+            });
+          });
+          if (btnExpTxs) btnExpTxs.addEventListener('click', function(){
+            var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var rows=[['data','descricao','valor','tipo','categoria']];
+            for (var i=0;i<arr.length;i++){ var t=arr[i]; rows.push([t.data,t.descricao,t.valor,t.tipo,categorize(t.descricao)]); } exportCSV('transacoes.csv', rows);
+          });
+
+          // Reports
+          var chart1=null, chart2=null;
+          function renderReports(){
+            var c1=document.getElementById('chartMes'); var c2=document.getElementById('chartCat'); if(!c1||!c2) return;
+            var ctx1=c1.getContext('2d'); var ctx2=c2.getContext('2d');
+            var txs=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); });
+            var byMonth={}, byCat={};
+            for (var i=0;i<txs.length;i++){
+              var t=txs[i]; if (t.tipo!=='DEBITO') continue; var d=new Date(t.data); if (isNaN(d)) continue; var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); byMonth[k]=(byMonth[k]||0)+Math.abs(t.valor||0); var cat=categorize(t.descricao); byCat[cat]=(byCat[cat]||0)+Math.abs(t.valor||0);
+            }
+            var labelsM=Object.keys(byMonth).sort(); var dataM=labelsM.map(function(k){ return Number(byMonth[k].toFixed(2)); });
+            var labelsC=Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }); var dataC=labelsC.map(function(k){ return Number(byCat[k].toFixed(2)); });
+            if (chart1) chart1.destroy(); if (chart2) chart2.destroy();
+            chart1=new Chart(ctx1,{type:'bar',data:{labels:labelsM,datasets:[{label:'Despesas por mês (R$)',data:dataM}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+            chart2=new Chart(ctx2,{type:'doughnut',data:{labels:labelsC,datasets:[{data:dataC}]} });
+          }
+
+          function renderRulesTable(){
+            var rules=FinStore.loadRules(); var tb=document.querySelector('#tblRules tbody'); if(!tb) return; tb.innerHTML='';
+            for (var i=0;i<rules.length;i++){
+              var r=rules[i]; var tr=document.createElement('tr'); tr.innerHTML='<td>'+r.pattern+'</td><td>'+r.categoria+'</td><td><button data-i="'+i+'" class="btn btnDelRule">Excluir</button></td>'; tb.appendChild(tr);
+            }
+            var dels=document.querySelectorAll('.btnDelRule');
+            for (var j=0;j<dels.length;j++){ dels[j].addEventListener('click',function(e){ var i=Number(e.target.getAttribute('data-i')); var arr=FinStore.loadRules(); arr.splice(i,1); FinStore.saveRules(arr); renderRulesTable(); renderReports(); }); }
+          }
+
+          function refreshAll(){ refreshReceiptsTable(); refreshTxs(); if (document.getElementById('reports') && document.getElementById('reports').classList.contains('active')) renderReports(); renderRulesTable(); }
+
+          (function init(){
+            var cfg=FinStore.loadCfg(); var ep=document.getElementById('endpoint'); if (ep) ep.value=cfg.endpoint||'';
+            var uf=document.getElementById('uf'); if (uf) uf.value=cfg.uf||'MG';
+            var mode=cfg.parserMode||'proxy'; var r=document.querySelector('input[name="parserMode"][value="'+mode+'"]'); if(r) r.checked=true;
+            if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
+            refreshAll();
+          })();
+
+        }catch(err){
+          console.error(err);
+          var el=document.getElementById('err'); var pre=document.getElementById('errlog');
+          if (el && pre){ pre.textContent=String(err && err.stack || err); el.style.display='block'; }
+        }
+      });
+    })();
+  </script>
 </body>
 </html>
