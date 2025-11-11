@@ -288,7 +288,7 @@
         return y+'-'+mo+'-'+d+'T'+hh+':'+mm+':'+ss;
       }
       async function fetchViaProxy(nfceUrl){
-        const proxied = 'https://r.jina.ai/http://' + nfceUrl.replace(/^https?:\/\//i,'').replace(/^\/\//,'');
+        let _url = nfceUrl.trim(); if (!/^https?:\/\//i.test(_url)) _url = 'https://' + _url; const proxied = 'https://r.jina.ai/' + _url;
         const resp = await fetch(proxied);
         if (!resp.ok) throw new Error('Proxy falhou ('+resp.status+')');
         return await resp.text();
@@ -322,7 +322,8 @@
           }
         }
         if (!emitente){
-          const topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente');
+          let topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente');
+          if (!topo) topo = doc.querySelector('[id*="emitente" i], [id*="Razao" i], [id*="razao" i], [id*="xNome" i]');
           emitente = clean(topo && topo.textContent || '');
         }
         var dataBR = '', hora = '';

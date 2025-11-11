@@ -1,1 +1,1 @@
-const SW_VERSION='v2.4.2';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());
+const SW_VERSION='v2.4.3';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>self.clients.claim());
