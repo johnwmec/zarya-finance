@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <link rel="manifest" href="manifest.json" />
+  <title>Zarya Finance</title>
+  <style>
+    :root{
+      --bg:#0b0b0b; --bg2:#111111; --card:#121212; --border:#282218;
+      --text:#f0eee6; --muted:#b9b3a1; --gold:#d4af37; --gold2:#c39a2b;
+      --btn:#1a150b; --btnb:#3a2f16;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial,'Noto Sans',sans-serif;margin:0;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 16px;z-index:10}
+    h1{font-size:18px;margin:0;letter-spacing:.3px}
+    h1 .brand{color:var(--gold)}
+    main{padding:16px;max-width:980px;margin:0 auto}
+    nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
+    nav button{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
+    nav button.active{background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08)); border-color:var(--gold2); color:#f7f3e4}
+    section{display:none}
+    section.active{display:block}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+    label{display:block;margin:8px 0 6px}
+    input,textarea,select{width:100%;border:1px solid var(--border);background:#0e0e0e;color:var(--text);border-radius:10px;padding:10px}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--border); padding:8px; text-align:left; font-size:14px}
+    .muted{opacity:.85;font-size:12px;color:var(--muted)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .row > *{flex:1 1 260px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    .btn{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
+    .btn.primary{background:linear-gradient(180deg, rgba(212,175,55,.18), rgba(212,175,55,.08)); border-color:var(--gold2); color:#f7f3e4}
+    video{width:100%;max-height:340px;border-radius:12px;border:1px solid var(--border);background:#000}
+    .small{font-size:12px}
+    a{color:var(--gold)}
+  </style>
+</head>
+<body>
+  <header><h1><span class="brand">Zarya Finance</span> • NFC-e + OFX (PWA)</h1></header>
+  <main>
+    <nav>
+      <button data-tab="scan" class="active">Scanner NFC-e</button>
+      <button data-tab="receipts">Notas</button>
+      <button data-tab="import">Importar OFX</button>
+      <button data-tab="txs">Lançamentos</button>
+      <button data-tab="match">Conciliação</button>
+      <button data-tab="reports">Relatórios</button>
+      <button data-tab="settings">Config</button>
+    </nav>
+
+    <section id="scan" class="active">
+      <div class="card">
+        <p class="muted">Use a câmera para ler o QR da NFC-e. Se o navegador não suportar, fotografe o QR ou cole a URL.</p>
+        <div class="row">
+          <div>
+            <video id="video" playsinline></video>
+            <div class="actions">
+              <button id="btnStart" class="btn primary">Iniciar câmera</button>
+              <button id="btnStop" class="btn">Parar</button>
+              <button id="btnSnap" class="btn">Capturar imagem</button>
+            </div>
+            <p id="scanStatus" class="small muted">Status: inativo</p>
+          </div>
+          <div>
+            <label for="qrUrl">Ou cole a URL do QR Code</label>
+            <input id="qrUrl" placeholder="https://...">
+            <div class="actions">
+              <button id="btnProcessUrl" class="btn">Processar URL</button>
+            </div>
+            <p class="small muted">Dica: aponte a câmera nativa do celular para o QR e copie a URL exibida.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card"><h3>Resultado</h3><pre id="result" class="small"></pre></div>
+    </section>
+
+    <section id="receipts">
+      <div class="card">
+        <div class="actions">
+          <button id="btnRefreshReceipts" class="btn">Atualizar</button>
+          <button id="btnExportReceipts" class="btn">Exportar CSV</button>
+        </div>
+        <table id="tblReceipts">
+          <thead><tr><th>Data</th><th>Emitente</th><th>Valor</th><th>Itens</th><th>UF</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="import">
+      <div class="card">
+        <label for="ofx">Arquivo OFX</label>
+        <input id="ofx" type="file" accept=".ofx">
+        <div class="actions">
+          <button id="btnImportOfx" class="btn primary">Importar</button>
+          <button id="btnExportTxs" class="btn">Exportar CSV</button>
+        </div>
+        <p id="ofxStatus" class="small muted">Nenhum arquivo enviado.</p>
+      </div>
+    </section>
+
+    <section id="txs">
+      <div class="card">
+        <table id="tblTxs">
+          <thead><tr><th>Data</th><th>Desc</th><th>Valor</th><th>Tipo</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="match">
+      <div class="card">
+        <p class="muted">Conciliação por valor e proximidade de data (MVP).</p>
+        <div class="actions"><button id="btnRunMatch" class="btn">Sugerir Matches</button></div>
+        <table id="tblMatch">
+          <thead><tr><th>Nota</th><th>Transação</th><th>Score</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reports">
+      <div class="card">
+        <h3>Relatórios</h3>
+        <div class="row">
+          <div><canvas id="chartMes" height="220"></canvas></div>
+          <div><canvas id="chartCat" height="220"></canvas></div>
+        </div>
+        <p class="muted small">Dica: crie regras para classificar automaticamente (aba abaixo).</p>
+      </div>
+      <div class="card">
+        <h3>Regras de categorização</h3>
+        <div class="row">
+          <div><label>Padrão (regex)</label><input id="rulePattern" placeholder="mercado|super|carrefour"></div>
+          <div><label>Categoria</label><input id="ruleCat" placeholder="Supermercado"></div>
+        </div>
+        <div class="actions"><button id="btnAddRule" class="btn">Adicionar regra</button></div>
+        <table id="tblRules"><thead><tr><th>Padrão</th><th>Categoria</th><th></th></tr></thead><tbody></tbody></table>
+      </div>
+    </section>
+
+    <section id="settings">
+      <div class="card">
+        <label for="endpoint">Endpoint do Parser (Apps Script)</label>
+        <input id="endpoint" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
+        <label for="uf">UF padrão (ex.: MG, SP...)</label>
+        <input id="uf" placeholder="MG">
+        <div class="actions">
+          <button id="btnSaveCfg" class="btn primary">Salvar</button>
+          <button id="btnClearAll" class="btn">Apagar TUDO (local)</button>
+        </div>
+        <p class="small muted">Dados locais. Para sincronizar em nuvem (Supabase), posso incluir depois sem custos.</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="store.js"></script>
+  <script src="ofx.js"></script>
+  <script src="nfce.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
