@@ -1,1 +1,81 @@
-<!doctype html><meta charset='utf-8'><title>Zarya</title>
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b0b0b" />
+  <link rel="manifest" href="manifest.json?v=2.3.4" />
+  <title>Zarya Finance</title>
+  <style>
+    :root{ --bg:#0a0a0a; --border:#2a2416; --text:#f6f4eb; --muted:#bdb6a3; --gold:#d4af37; --gold2:#c39a2b; --btn:#1a150b; --btnb:#3a2f16; --chip:#0f0d08; }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:linear-gradient(180deg,#090909,#0f0f0f);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(16,16,16,.85);backdrop-filter: blur(6px);border-bottom:1px solid var(--border);padding:14px 16px;z-index:10}
+    h1{font-size:18px;margin:0}
+    h1 .brand{color:var(--gold)}
+    main{padding:16px;max-width:1040px;margin:0 auto}
+    nav{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
+    nav button{background:var(--btn);color:var(--gold);border:1px solid var(--btnb);border-radius:12px;padding:10px 14px;cursor:pointer}
+    nav button.active{background:linear-gradient(180deg, rgba(212,175,55,.20), rgba(212,175,55,.08)); border-color:var(--gold2); color:#fff}
+    section{display:none}
+    section.active{display:block}
+    .card{background:linear-gradient(180deg,#131313,#0e0e0e);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px}
+    .muted{opacity:.85;font-size:12px;color:var(--muted)}
+    #err{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);color:#ffb4b4;z-index:9999;padding:16px;overflow:auto;border-top:2px solid #b00020}
+    #err pre{white-space:pre-wrap}
+    .boot{background:#111;border-bottom:1px solid var(--border);padding:8px 12px;color:#d8c48a;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="boot">Zarya Finance 2.3.4 — carregando scripts… Se ficar só nisso, clique em <a href="#" id="panic">forçar atualização</a>.</div>
+  <div id="err"><strong>Erro de execução no app</strong><pre id="errlog"></pre><button onclick="this.parentElement.style.display='none'">Fechar</button></div>
+  <header><h1><span class="brand">Zarya Finance</span> • NFC-e + OFX (PWA)</h1></header>
+  <main>
+    <nav>
+      <button data-tab="scan" class="active">Scanner NFC-e</button>
+      <button data-tab="receipts">Notas</button>
+      <button data-tab="settings">Config</button>
+      <button data-tab="debug">Diagnóstico</button>
+    </nav>
+    <section id="scan" class="active">
+      <div class="card">
+        <p class="muted">Teste rápido: se você vê esta seção, o HTML carregou. Abaixo, os scripts mostrarão o status.</p>
+        <p id="bootStatus" class="muted">Scripts ainda iniciando…</p>
+      </div>
+    </section>
+    <section id="receipts"><div class="card"><p>Notas (placeholder)</p></div></section>
+    <section id="settings"><div class="card"><p>Config (placeholder)</p></div></section>
+    <section id="debug"><div class="card"><p>Diagnóstico (placeholder)</p><input id="dbgUrl" placeholder="https://..."><button id="btnDbgTest">Testar</button><pre id="dbgOut"></pre></div></section>
+  </main>
+
+  <script>
+    (function(){
+      function showErr(msg, src, ln, col, err){
+        var el=document.getElementById('err'); var pre=document.getElementById('errlog');
+        if(!el||!pre) return;
+        pre.textContent = (msg||'') + '\\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err?'\\n'+(err.stack||err):'');
+        el.style.display='block';
+      }
+      window.addEventListener('error', function(e){ showErr(e.message, e.filename, e.lineno, e.colno, e.error); });
+      window.addEventListener('unhandledrejection', function(e){ showErr('Unhandled: '+(e.reason && e.reason.message || e.reason), '', '', '', e.reason); });
+      document.getElementById('panic').addEventListener('click', async (ev)=>{
+        ev.preventDefault();
+        if ('serviceWorker' in navigator){
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs){ await r.unregister(); }
+        }
+        if ('caches' in window){
+          const keys = await caches.keys();
+          for (const k of keys){ await caches.delete(k); }
+        }
+        location.href = location.pathname + '?clean=' + Date.now();
+      });
+      if ('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js?v=2.3.4').catch(()=>{}); }
+    })();
+  </script>
+
+  <script defer src="store.js?v=2.3.4"></script>
+  <script defer src="nfce.js?v=2.3.4"></script>
+  <script defer src="main.js?v=2.3.4"></script>
+</body>
+</html>
