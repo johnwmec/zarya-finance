@@ -42,7 +42,7 @@
   </style>
 </head>
 <body>
-  <div id="boot">Zarya Finance v2.5.2 — carregando…</div>
+  <div id="boot">Zarya Finance v2.6.0 — carregando…</div>
   <div id="err"><strong>Erro de execução no app</strong><pre id="errlog"></pre><button onclick="this.parentElement.style.display='none'">Fechar</button></div>
   <header><h1><span class="brand">Zarya</span> Finance • NFC-e (PWA)</h1></header>
   <main>
@@ -64,13 +64,13 @@
 
     <section id="scan" class="active">
       <div class="card">
-        <p class="muted">Use a câmera traseira para ler o QR da NFC-e. Se tiver problemas, use o <b>Leitor alternativo (ZXing)</b> ou cole a URL manualmente.</p>
+        <p class="muted">Use a camera traseira para ler o QR da NFC-e. Se tiver problemas, use o <b>Leitor alternativo (ZXing)</b> ou cole a URL manualmente.</p>
         <div class="row">
           <div>
             <video id="video" playsinline></video>
             <div class="actions">
-              <button id="btnStart" class="btn primary">Iniciar câmera (traseira)</button>
-              <button id="btnSwitchCam" class="btn">Trocar câmera</button>
+              <button id="btnStart" class="btn primary">Iniciar camera (traseira)</button>
+              <button id="btnSwitchCam" class="btn">Trocar camera</button>
               <button id="btnStop" class="btn">Parar</button>
               <button id="btnZXing" class="btn">Leitor alternativo (ZXing)</button>
             </div>
@@ -103,7 +103,7 @@
 
     <section id="debug">
       <div class="card">
-        <h3>Diagnóstico do Parser</h3>
+        <h3>Diagnostico do Parser</h3>
         <div class="row">
           <div><input id="dbgUrl" placeholder="https://..."></div>
         </div>
@@ -116,15 +116,15 @@
 
     <section id="settings">
       <div class="card">
-        <h3>Configurações</h3>
+        <h3>Configuracoes</h3>
         <label for="endpoint">Endpoint do Parser (Apps Script) — opcional</label>
         <input id="endpoint" placeholder="https://script.google.com/macros/s/AKfycb.../exec">
         <label>Modo do Parser</label>
         <div class="row">
           <label><input type="radio" name="parserMode" value="apps"> Apps Script</label>
-          <label><input type="radio" name="parserMode" value="proxy" checked> Proxy Público (r.jina.ai)</label>
+          <label><input type="radio" name="parserMode" value="proxy" checked> Proxy Publico (r.jina.ai)</label>
         </div>
-        <label for="uf">UF padrão</label>
+        <label for="uf">UF padrao</label>
         <input id="uf" placeholder="MG">
         <div class="actions">
           <button id="btnSaveCfg" class="btn primary">Salvar</button>
@@ -137,368 +137,9 @@
 
   <noscript>Ative o JavaScript para usar o Zarya Finance.</noscript>
 
-  <script>
-    (function(){
-      function showErr(msg, src, ln, col, err){
-        var el=document.getElementById('err'); var pre=document.getElementById('errlog');
-        if(!el||!pre){ alert(msg); return; }
-        pre.textContent = (msg||'') + '\\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err ? '\\n' + (err.stack||err) : '');
-        el.style.display='block';
-      }
-      window.addEventListener('error', function(e){ showErr(e.message, e.filename, e.lineno, e.colno, e.error); });
-      window.addEventListener('unhandledrejection', function(e){ showErr('Unhandled: ' + (e.reason && e.reason.message || e.reason), '', '', '', e.reason); });
-    })();
-  </script>
-
   <script src="https://unpkg.com/@zxing/library@latest"></script>
-
-  <script>
-    // ===== Storage
-    const FinStore = {
-      cfgKey: 'finapp_cfg_v2', recKey: 'finapp_receipts_v2',
-      loadCfg(){ try{ return JSON.parse(localStorage.getItem(this.cfgKey)||'{}'); }catch(e){ return {}; } },
-      saveCfg(cfg){ localStorage.setItem(this.cfgKey, JSON.stringify(cfg||{})); },
-      loadReceipts(){ try{ return JSON.parse(localStorage.getItem(this.recKey)||'[]'); }catch(e){ return []; } },
-      saveReceipts(a){ localStorage.setItem(this.recKey, JSON.stringify(a||[])); },
-      wipe(){ localStorage.removeItem(this.cfgKey); localStorage.removeItem(this.recKey); }
-    };
-    function inPeriod(dateISO, period){
-      const d = new Date(dateISO); if (isNaN(d)) return false;
-      const now = new Date(); let start = null;
-      if (period.mode==='last30'){ start=new Date(now); start.setDate(start.getDate()-30); }
-      else if (period.mode==='year'){ start=new Date(now.getFullYear(),0,1); }
-      else { start=new Date(now.getFullYear(), now.getMonth(), 1); }
-      return d>=start && d<=now;
-    }
-    function exportCSV(filename, rows){
-      const esc = (v)=>('"' + String(v).replace(/"/g,'""') + '"');
-      const csv = rows.map(r=>r.map(esc).join(',')).join('\\n');
-      const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-      setTimeout(()=>URL.revokeObjectURL(url), 1500);
-    }
-
-    // ===== NFC-e Parser
-    function clean(s){ return String(s||'').replace(/\\s+/g,' ').replace(/\\u00A0/g,' ').trim(); }
-    function brToNumber(txt){
-      if (txt == null) return null;
-      const s = String(txt).replace(/\\u00A0/g,' ').trim();
-      if (!s) return null;
-      const cleaned = s.replace(/[R$\\s]/gi,'');
-      const n = cleaned.replace(/\\./g,'').replace(',', '.');
-      const v = parseFloat(n);
-      return isNaN(v) ? null : v;
-    }
-    function toISO(dateStr, timeStr){
-      if (!dateStr) return new Date().toISOString();
-      const m = /(\\d{2})\\/(\\d{2})\\/(\\d{4})/.exec(dateStr);
-      if (!m) return new Date().toISOString();
-      var d=m[1], mo=m[2], y=m[3];
-      var hh='00', mm='00', ss='00';
-      if (timeStr){
-        const t = /(\\d{2}):(\\d{2})(?::(\\d{2}))?/.exec(timeStr);
-        if (t){ hh=t[1]; mm=t[2]; ss=t[3]||'00'; }
-      }
-      return y+'-'+mo+'-'+d+'T'+hh+':'+mm+':'+ss;
-    }
-    async function fetchViaProxy(nfceUrl){
-      let _url = nfceUrl.trim(); if (!/^https?:\\/\\//i.test(_url)) _url = 'https://' + _url;
-      const proxied = 'https://r.jina.ai/' + _url;
-      const resp = await fetch(proxied);
-      if (!resp.ok) throw new Error('Proxy falhou ('+resp.status+')');
-      return await resp.text();
-    }
-    async function fetchViaAppsScript(nfceUrl){
-      var cfg = FinStore.loadCfg();
-      if(!cfg.endpoint) throw new Error('Defina o endpoint do Apps Script em Config.');
-      const resp = await fetch(cfg.endpoint + (cfg.endpoint.includes('?')?'&':'?') + 'url='+encodeURIComponent(nfceUrl)+'&v=3&raw=true');
-      if (!resp.ok) throw new Error('Falha no parser ('+resp.status+')');
-      return await resp.text();
-    }
-    function mdNumberBR(s){
-      if (!s) return null; s=String(s);
-      var cleaned = s.replace(/[R$\\s]/gi,'').replace(/\\./g,'').replace(',', '.');
-      var v = parseFloat(cleaned); return isNaN(v)?null:v;
-    }
-    function parseFromMarkdown(md, url){
-      var text = md;
-      var emitente = '';
-      var cnpj = '';
-      var dataBR = '';
-      var hora = '';
-      var valorTotal = null;
-      var uf = '';
-      var items = [];
-
-      var mEmit = /####\\s*\\*\\*([^*\\n]+)\\*\\*/i.exec(text);
-      if (mEmit) emitente = mEmit[1].trim();
-      if (!emitente){
-        var mEmit2 = /\\|\\s*Nome\\s*\\/\\s*Raz\\w+\\s*\\|[\\s\\S]*?\\|\\s*([^|\\n]+?)\\s*\\|\\s*\\d{8,}\\s*\\|/i.exec(text);
-        if (mEmit2) emitente = mEmit2[1].trim();
-      }
-
-      var mCNPJ = /CNPJ:\\s*([\\d\\.\\/-]+)/i.exec(text);
-      if (mCNPJ) cnpj = mCNPJ[1].replace(/\\D+/g,'');
-
-      var mUF = /\\|\\s*UF\\s*\\|[\\s\\S]*?\\|\\s*([A-Z]{2})\\s*\\|/i.exec(text);
-      if (!mUF){
-        mUF = /(,\\s*([A-Z]{2}))\\s*-?\\s*\\d{5}-\\d{3}/m.exec(text);
-      }
-      uf = (mUF && (mUF[1]||mUF[2])) ? (mUF[1]||mUF[2]).toUpperCase() : '';
-
-      var mData = /\\|\\s*Modelo\\s*\\|\\s*S[ée]rie\\s*\\|\\s*N[úu]mero\\s*\\|\\s*Data Emiss[aã]o\\s*\\|[\\s\\S]*?\\|\\s*\\d+\\s*\\|\\s*\\d+\\s*\\|\\s*\\d+\\s*\\|\\s*(\\d{2}\\/\\d{2}\\/\\d{4})\\s*(\\d{2}:\\d{2}(?::\\d{2})?)?\\s*\\|/i.exec(text);
-      if (!mData){
-        mData = /(\\d{2}\\/\\d{2}\\/\\d{4})\\s+(\\d{2}:\\d{2}(?::\\d{2})?)/.exec(text);
-      }
-      if (mData){ dataBR = mData[1]; hora = (mData[2]||'').trim(); }
-
-      var mV1 = /\\*\\*Valor total R\\$\\*\\*[\\s\\S]*?\\*\\*\\s*([0-9\\.,]+)\\s*\\*\\*/i.exec(text);
-      if (mV1) valorTotal = mdNumberBR(mV1[1]);
-      if (valorTotal==null){
-        var mV2 = /Valor\\s*total\\s*R\\$\\s*:?\\s*R\\$\\s*([0-9\\.,]+)/i.exec(text);
-        if (mV2) valorTotal = mdNumberBR(mV2[1]);
-      }
-      if (valorTotal==null){
-        var mV3 = /Valor\\s*pago\\s*R\\$[\\s\\S]*?\\*\\*\\s*([0-9\\.,]+)\\s*\\*\\*/i.exec(text);
-        if (mV3) valorTotal = mdNumberBR(mV3[1]);
-      }
-
-      var reItem = /(.*?)\\(C[oó]digo:[^)]+\\)\\s*Qtde total de [^:]+:\\s*([0-9\\.,]+)\\s*UN:\\s*([A-Z]+)\\s*Valor total R\\$:\\s*R\\$\\s*([0-9\\.,]+)/gi;
-      var im;
-      while ((im = reItem.exec(text))){
-        var desc = im[1].replace(/\\s+/g,' ').trim();
-        var qtd = mdNumberBR(im[2])||1;
-        var un = im[3].trim();
-        var vtot = mdNumberBR(im[4])||0;
-        var vun = (qtd && vtot)? vtot/qtd : null;
-        if (desc && vtot>0) items.push({ descricao: desc, quantidade: qtd, unidade: un, valor_unitario: vun, valor_total: vtot });
-      }
-
-      var chm = ( /chNFe=([\\d]{44})/i.exec(url) || /p=([\\d]{44})/i.exec(url) );
-      var chave = chm? chm[1] : '';
-
-      var dataISO = toISO(dataBR, hora);
-
-      return { emitente: emitente||'', cnpj: (cnpj||'').replace(/\\D+/g,''), documento:'', data: dataISO, data_br: dataBR||'', hora: hora||'', uf: uf||'', chave: chave||'', valor: valorTotal||0, items: items, _mode:'markdown' };
-    }
-    function parseWithDOM(html, url){
-      var looksLikeMarkdown = (!/<!doctype|<html[\\s>]/i.test(html)) && (/Markdown Content:|\\*\\*|^#|\\|\\s*-{3,}\\s*\\|/m.test(html));
-      if (looksLikeMarkdown) return parseFromMarkdown(html, url);
-
-      const doc = new DOMParser().parseFromString(html, 'text/html');
-      var emitente='', cnpj='', documento='';
-      const allRows = Array.from(doc.querySelectorAll('table tr'));
-      for(const tr of allRows){
-        const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
-        if (tds.length>=2){
-          if (!emitente && /raz[aã]o social|emitente|nome\\/raza[oã]/i.test(tds[0])) emitente = tds[1];
-          if (!cnpj && /cnpj/i.test(tds[0])) cnpj = tds[1].replace(/\\D+/g,'');
-          if (!documento && /(cpf.*consumidor|cpf\\/cnpj.*consumidor|cpf do consumidor)/i.test(tds[0])) documento = tds[1];
-          if (!emitente && /raz[aã]o social|emitente|nome\\/raza[oã]/i.test(tds[1])) emitente = tds[0];
-          if (!cnpj && /cnpj/i.test(tds[1])) cnpj = tds[0].replace(/\\D+/g,'');
-        }
-      }
-      if (!emitente){
-        const topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente, [id*="emitente" i], [id*="Razao" i], [id*="razao" i], [id*="xNome" i]');
-        emitente = clean(topo && topo.textContent || '');
-      }
-      var dataBR = '', hora = '';
-      const labels = ['Data de Emissão','Data/Hora da Emissão','Emissão'];
-      for (const tr of allRows){
-        const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
-        if (tds.length>=2){
-          if (labels.some(l=>tds[0].indexOf(l)>=0)){
-            const dm = /(\\d{2}\\/\\d{2}\\/\\d{4})/.exec(tds[1]);
-            const hm = /(\\d{2}:\\d{2}:\\d{2}|\\d{2}:\\d{2})/.exec(tds[1]);
-            if (dm) dataBR = dm[1];
-            if (hm) hora = hm[1];
-          }
-        }
-      }
-      if (!dataBR){
-        const m = /Data\\/Hora da Emiss[aã]o[^<]*>\\s*([^<]+)/i.exec(html);
-        if (m){ const dm = /(\\d{2}\\/\\d{2}\\/\\d{4})/.exec(m[1]); const hm = /(\\d{2}:\\d{2}(?::\\d{2})?)/.exec(m[1]); dataBR = dm?dm[1]:''; hora = hm?hm[1]:''; }
-      }
-      const dataISO = toISO(dataBR, hora);
-      var valorTotal = null;
-      for (const tr of allRows){
-        const tds = Array.from(tr.querySelectorAll('td')).map(td=>clean(td.innerText||td.textContent||''));
-        if (tds.length>=2 && /valor\\s*(total|a pagar)/i.test(tds[0])){ valorTotal = brToNumber(tds[1]); break; }
-      }
-      if (valorTotal==null){
-        const nodes = Array.from(doc.querySelectorAll('td, th, span, div, b, strong')).map(e=>clean(e.textContent));
-        let totalLine = nodes.find(t=>/valor\\s*(a\\s*)?pagar/i.test(t));
-        if (!totalLine) totalLine = nodes.find(t=>/^total\\s*r\\$/i.test(t));
-        if (totalLine){ const num = totalLine.replace(/[^0-9\\.,]/g,''); valorTotal = brToNumber(num); }
-      }
-      if (valorTotal==null) valorTotal = 0;
-      const items = [];
-      const ufm = /\\/\\/(\\w{2})\\./i.exec(url); const uf = ufm && ufm[1] ? ufm[1].toUpperCase() : '';
-      const chm = ( /chNFe=([\\d]{44})/i.exec(url) || /p=([\\d]{44})/i.exec(url) ); const chave = chm ? chm[1] : '';
-      return { emitente: emitente, cnpj: (cnpj||'').replace(/\\D+/g,''), documento: documento, data: dataISO, data_br: dataBR, hora: hora, uf: uf, chave: chave, valor: valorTotal, items: items, _mode:'html' };
-    }
-    async function getHtml(url){
-      var cfg = FinStore.loadCfg();
-      if (cfg.parserMode==='proxy' || !cfg.endpoint){ try{ return await fetchViaProxy(url); }catch(e){ return await fetchViaAppsScript(url); } }
-      try{ return await fetchViaAppsScript(url); }catch(e){ return await fetchViaProxy(url); }
-    }
-    async function processNfceUrl(url){
-      const html = await getHtml(url);
-      const data = parseWithDOM(html, url);
-      const arr = FinStore.loadReceipts();
-      arr.unshift({ id: String(Date.now()), emitente: data.emitente||'', cnpj: data.cnpj||'', documento: data.documento||'', data: data.data || new Date().toISOString(), valor: data.valor||0, uf: data.uf||'', chave: data.chave||'', url: url, itens: data.items||[] });
-      FinStore.saveReceipts(arr);
-      return arr[0];
-    }
-    async function debugRaw(url){
-      const html = await getHtml(url); const parsed = parseWithDOM(html, url);
-      const title=(/<title>([^<]*)<\\/title>/i.exec(html)||[])[1]||'';
-      return { parsed, title, length: html.length, mode: parsed._mode||'unknown', head: html.slice(0, 8000), tail: html.slice(-6000) };
-    }
-    window.NFCE = { processNfceUrl, debugRaw };
-  </script>
-
-  <script>
-    // ===== Main (UI)
-    document.addEventListener('DOMContentLoaded', function(){
-      try{
-        var boot = document.getElementById('boot'); if (boot) boot.textContent = 'Zarya Finance v2.5.2 — pronto';
-        var currentStream=null, currentDeviceId=null, detector=null, zxingReader=null;
-        var period = { mode:'month' };
-
-        function switchTab(id){
-          document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.getAttribute('data-tab')===id));
-          document.querySelectorAll('main section').forEach(s=>s.classList.toggle('active', s.id===id));
-        }
-        document.addEventListener('click', function(e){
-          var t=e.target;
-          if (t.matches && t.matches('nav button')) switchTab(t.getAttribute('data-tab'));
-          if (t.id==='chipMonth'){ period.mode='month'; refreshReceiptsTable(); }
-          if (t.id==='chip30'){ period.mode='last30'; refreshReceiptsTable(); }
-          if (t.id==='chipYear'){ period.mode='year'; refreshReceiptsTable(); }
-        });
-
-        function ensureDetector(){ if ('BarcodeDetector' in window){ detector = new BarcodeDetector({ formats: ['qr_code'] }); } else detector=null; return detector; }
-        function video(){ return document.getElementById('video'); }
-        function scanStatus(){ return document.getElementById('scanStatus'); }
-        function result(){ return document.getElementById('result'); }
-
-        function listCameras(){ return navigator.mediaDevices.enumerateDevices().then(d=>d.filter(x=>x.kind==='videoinput')); }
-        function stopCam(){ if (currentStream){ currentStream.getTracks().forEach(t=>t.stop()); currentStream=null; } var st=scanStatus(); if (st) st.textContent='Status: inativo'; }
-
-        function loopScan(){
-          var v=video(); if (!detector || !v || v.readyState<2){ requestAnimationFrame(loopScan); return; }
-          createImageBitmap(v).then(bmp=>detector.detect(bmp).then(codes=>{
-            if (codes && codes.length){ var raw=codes[0].rawValue; stopCam(); if (result()) result().textContent='QR: '+raw+'\\nProcessando...'; handleQr(raw); }
-            else requestAnimationFrame(loopScan);
-          }).catch(()=>requestAnimationFrame(loopScan))).catch(()=>requestAnimationFrame(loopScan));
-        }
-
-        function startCam(preferBack){
-          if (preferBack===undefined) preferBack=true;
-          ensureDetector();
-          navigator.mediaDevices.getUserMedia({ video: { facingMode: preferBack?{ideal:'environment'}:{ideal:'user'} }, audio:false }).then(stream=>{
-            currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play().then(()=>{
-              listCameras().then(cams=>{
-                var back = cams.find(c=>/back|trás|tras|rear/i.test(c.label)); if (back && preferBack){ switchToDevice(back.deviceId); }
-              });
-              var st=scanStatus(); if (st) st.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (sem detector nativo; use Leitor Alternativo)';
-              if (detector) loopScan();
-            });
-          }).catch(e=>{ var st=scanStatus(); if (st) st.textContent='Erro: '+e.message; });
-        }
-        function switchToDevice(deviceId){
-          stopCam(); currentDeviceId=deviceId;
-          navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio:false }).then(stream=>{
-            currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play();
-          }).catch(e=>{ var st=scanStatus(); if (st) st.textContent='Erro ao trocar câmera: '+e.message; });
-        }
-        function startZXing(){
-          try{
-            var ZX = window.ZXing; if (!ZX) throw new Error('Biblioteca ZXing não carregou');
-            var Reader = ZX.BrowserMultiFormatReader;
-            zxingReader = new Reader();
-            zxingReader.listVideoInputDevices().then(cams=>{
-              var deviceId = cams[0] && cams[0].deviceId; var back = cams.find(c=>/back|trás|tras|rear/i.test(c.label)); if (back) deviceId=back.deviceId;
-              var v=video(); if (!v) return;
-              zxingReader.decodeFromVideoDevice(deviceId, v, function(res,err){
-                if (res){ zxingReader.reset(); stopCam(); if (result()) result().textContent='QR: '+res.getText()+'\\nProcessando...'; handleQr(res.getText()); }
-              });
-              var st=scanStatus(); if (st) st.textContent='ZXing: leitor alternativo ativo';
-            });
-          }catch(e){ var st=scanStatus(); if (st) st.textContent='ZXing erro: '+e.message; }
-        }
-
-        var btnStart = document.getElementById('btnStart');
-        var btnSwitch = document.getElementById('btnSwitchCam');
-        var btnZXing = document.getElementById('btnZXing');
-        var btnStop = document.getElementById('btnStop');
-        var btnProcessUrl = document.getElementById('btnProcessUrl');
-        if (btnStart) btnStart.addEventListener('click', function(){ startCam(true); });
-        if (btnSwitch) btnSwitch.addEventListener('click', function(){
-          listCameras().then(function(cams){ if (!cams.length) return alert('Nenhuma câmera encontrada'); var idx = cams.findIndex(function(c){ return c.deviceId===currentDeviceId; }); var next = cams[(idx+1+cams.length)%cams.length]; switchToDevice(next.deviceId); });
-        });
-        if (btnZXing) btnZXing.addEventListener('click', startZXing);
-        if (btnStop) btnStop.addEventListener('click', stopCam);
-        if (btnProcessUrl) btnProcessUrl.addEventListener('click', function(){
-          var q = document.getElementById('qrUrl').value.trim(); if (!q){ if (result()) result().textContent='Informe a URL do QR.'; return; } handleQr(q);
-        });
-
-        function handleQr(url){
-          window.NFCE.processNfceUrl(url).then(function(rec){
-            if (result()) result().textContent='OK! Nota salva:\\n'+JSON.stringify(rec,null,2); refreshReceiptsTable();
-          }).catch(function(e){ if (result()) result().textContent='Falha: '+e.message; });
-        }
-
-        var dbgBtn = document.getElementById('btnDbgTest');
-        if (dbgBtn) dbgBtn.addEventListener('click', function(){
-          var url = (document.getElementById('dbgUrl') && document.getElementById('dbgUrl').value || '').trim();
-          var outEl = document.getElementById('dbgOut');
-          if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
-          window.NFCE.debugRaw(url).then(function(pack){
-            if (outEl) outEl.textContent = JSON.stringify(pack, null, 2);
-          }).catch(function(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; });
-        });
-
-        var btnSaveCfg = document.getElementById('btnSaveCfg');
-        var btnClearAll = document.getElementById('btnClearAll');
-        if (btnSaveCfg) btnSaveCfg.addEventListener('click', function(){
-          var endpoint=document.getElementById('endpoint').value.trim(); var uf=document.getElementById('uf').value.trim();
-          var mode=(document.querySelector('input[name="parserMode"]:checked') && document.querySelector('input[name="parserMode"]:checked').value) || 'proxy';
-          var cfg=FinStore.loadCfg(); cfg.endpoint=endpoint; cfg.uf=uf; cfg.parserMode=mode; FinStore.saveCfg(cfg);
-          var s=document.getElementById('cfgStatus'); if (s) s.textContent='Configurações salvas.';
-        });
-        if (btnClearAll) btnClearAll.addEventListener('click', function(){
-          if(!confirm('Apagar todos os dados locais?')) return; FinStore.wipe();
-          var s=document.getElementById('cfgStatus'); if (s) s.textContent='Dados limpos.'; refreshReceiptsTable();
-        });
-
-        function refreshReceiptsTable(){
-          var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
-          var tb=document.querySelector('#tblReceipts tbody'); if (!tb) return; tb.innerHTML='';
-          arr.forEach(function(r){
-            var tr=document.createElement('tr');
-            tr.innerHTML='<td>'+new Date(r.data).toLocaleString()+'</td><td>'+ (r.emitente||'') +'</td><td>R$ '+Number(r.valor||0).toFixed(2)+'</td><td>'+((r.itens||[]).length)+'</td><td>'+(r.uf||'')+'</td>';
-            tb.appendChild(tr);
-          });
-        }
-        document.getElementById('btnRefreshReceipts').addEventListener('click', refreshReceiptsTable);
-        document.getElementById('btnExportReceipts').addEventListener('click', function(){
-          var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
-          var rows=[['data','emitente','cnpj','documento','valor','uf','chave','url','itens']];
-          arr.forEach(function(r){ rows.push([r.data,r.emitente,r.cnpj,r.documento||'',r.valor,r.uf,r.chave,r.url,(r.itens||[]).length]); });
-          exportCSV('receipts.csv', rows);
-        });
-
-        // SW
-        if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
-      }catch(err){
-        console.error(err);
-        var el=document.getElementById('err'); var pre=document.getElementById('errlog');
-        if (el && pre){ pre.textContent=String(err && err.stack || err); el.style.display='block'; }
-      }
-    });
-  </script>
+  <script src="store.js"></script>
+  <script src="nfce.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
