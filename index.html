@@ -39,11 +39,10 @@
     #err{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);color:#ffb4b4;z-index:9999;padding:16px;overflow:auto;border-top:2px solid #b00020}
     #err pre{white-space:pre-wrap}
     #boot{position:fixed;left:0;right:0;top:0;padding:8px 12px;background:#111;color:#ddd;border-bottom:1px solid #333;font-size:12px;z-index:9998}
-    #ping{position:fixed;right:8px;bottom:8px;background:#111;border:1px solid #333;padding:6px 10px;border-radius:10px;font-size:12px}
   </style>
 </head>
 <body>
-  <div id="boot">Zarya Finance v2.4.2 — carregando…</div>
+  <div id="boot">Zarya Finance v2.5.0 — carregando…</div>
   <div id="err"><strong>Erro de execução no app</strong><pre id="errlog"></pre><button onclick="this.parentElement.style.display='none'">Fechar</button></div>
   <header><h1><span class="brand">Zarya Finance</span> • NFC-e + OFX (PWA)</h1></header>
   <main>
@@ -172,30 +171,27 @@
     <section id="debug">
       <div class="card">
         <h3>Diagnóstico do Parser</h3>
-        <p class="small muted">Cole a URL da NFC-e abaixo e clique em <b>Testar</b> para ver o que o parser leu (sem salvar).</p>
+        <p class="small muted">Cole a URL da NFC-e abaixo e clique em <b>Testar</b> para ver o que o parser leu (sem salvar). O diagnóstico indica se o modo foi <code>html</code> ou <code>markdown</code>.</p>
         <div class="row">
           <div><input id="dbgUrl" placeholder="https://..."></div>
         </div>
         <div class="actions">
           <button id="btnDbgTest" class="btn">Testar</button>
-          <button id="btnDbgCopy" class="btn">Copiar HTML</button>
         </div>
         <pre id="dbgOut" class="small"></pre>
       </div>
     </section>
   </main>
 
-  <div id="ping">Ping de interação: <span id="pingVal">—</span></div>
-
   <noscript>Ative o JavaScript para usar o Zarya Finance.</noscript>
 
-  <!-- Error overlay (sempre primeiro) -->
+  <!-- Error overlay -->
   <script>
     (function(){
       function showErr(msg, src, ln, col, err){
         var el=document.getElementById('err'); var pre=document.getElementById('errlog');
         if(!el||!pre){ alert(msg); return; }
-        pre.textContent = (msg||'') + '\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err ? '\n' + (err.stack||err) : '');
+        pre.textContent = (msg||'') + '\\n' + (src||'') + ':' + (ln||'?') + ':' + (col||'?') + (err ? '\\n' + (err.stack||err) : '');
         el.style.display='block';
       }
       window.addEventListener('error', function(e){ showErr(e.message, e.filename, e.lineno, e.colno, e.error); });
@@ -203,11 +199,10 @@
     })();
   </script>
 
-  <!-- ZXing e Chart.js (únicos externos) -->
   <script src="https://unpkg.com/@zxing/library@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- store.js inline -->
+  <!-- store.js -->
   <script>
     const FinStore = {
       cfgKey: 'finapp_cfg_v2', recKey: 'finapp_receipts_v2', txKey:  'finapp_txs_v2', rulesKey: 'finapp_rules_v2',
@@ -232,7 +227,7 @@
     }
     function exportCSV(filename, rows){
       const esc = (v)=>('"' + String(v).replace(/"/g,'""') + '"');
-      const csv = rows.map(r=>r.map(esc).join(',')).join('\n');
+      const csv = rows.map(r=>r.map(esc).join(',')).join('\\n');
       const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
@@ -245,10 +240,10 @@
     }
   </script>
 
-  <!-- ofx.js inline -->
+  <!-- ofx.js -->
   <script>
     async function parseOFX(text){
-      const txs = []; const lines = text.split(/\r?\n/); let cur = {};
+      const txs = []; const lines = text.split(/\\r?\\n/); let cur = {};
       for (let raw of lines){
         const line = raw.trim();
         if (line.startsWith('<STMTTRN>')) cur = {};
@@ -263,33 +258,34 @@
     function ofxDateToISO(s){ if (!s) return null; const y=s.slice(0,4),m=s.slice(4,6),d=s.slice(6,8),hh=s.slice(8,10)||'00',mm=s.slice(10,12)||'00',ss=s.slice(12,14)||'00'; return y+'-'+m+'-'+d+'T'+hh+':'+mm+':'+ss; }
   </script>
 
-  <!-- nfce.js inline -->
+  <!-- nfce.js -->
   <script>
     (function(){
-      function clean(s){ return String(s||'').replace(/\s+/g,' ').replace(/\u00A0/g,' ').trim(); }
+      function clean(s){ return String(s||'').replace(/\\s+/g,' ').replace(/\\u00A0/g,' ').trim(); }
       function brToNumber(txt){
         if (txt == null) return null;
-        const s = String(txt).replace(/\u00A0/g,' ').trim();
+        const s = String(txt).replace(/\\u00A0/g,' ').trim();
         if (!s) return null;
-        const cleaned = s.replace(/[R$\s]/gi,'');
-        const n = cleaned.replace(/\./g,'').replace(',', '.');
+        const cleaned = s.replace(/[R$\\s]/gi,'');
+        const n = cleaned.replace(/\\./g,'').replace(',', '.');
         const v = parseFloat(n);
         return isNaN(v) ? null : v;
       }
       function toISO(dateStr, timeStr){
         if (!dateStr) return new Date().toISOString();
-        const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(dateStr);
+        const m = /(\\d{2})\\/(\\d{2})\\/(\\d{4})/.exec(dateStr);
         if (!m) return new Date().toISOString();
         var d=m[1], mo=m[2], y=m[3];
         var hh='00', mm='00', ss='00';
         if (timeStr){
-          const t = /(\d{2}):(\d{2})(?::(\d{2}))?/.exec(timeStr);
+          const t = /(\\d{2}):(\\d{2})(?::(\\d{2}))?/.exec(timeStr);
           if (t){ hh=t[1]; mm=t[2]; ss=t[3]||'00'; }
         }
         return y+'-'+mo+'-'+d+'T'+hh+':'+mm+':'+ss;
       }
       async function fetchViaProxy(nfceUrl){
-        let _url = nfceUrl.trim(); if (!/^https?:\/\//i.test(_url)) _url = 'https://' + _url; const proxied = 'https://r.jina.ai/' + _url;
+        let _url = nfceUrl.trim(); if (!/^https?:\\/\\//i.test(_url)) _url = 'https://' + _url;
+        const proxied = 'https://r.jina.ai/' + _url;
         const resp = await fetch(proxied);
         if (!resp.ok) throw new Error('Proxy falhou ('+resp.status+')');
         return await resp.text();
@@ -308,23 +304,92 @@
           return await resp.text();
         }
       }
+      function mdNumberBR(s){
+        if (!s) return null; s=String(s);
+        var cleaned = s.replace(/[R$\\s]/gi,'').replace(/\\./g,'').replace(',', '.');
+        var v = parseFloat(cleaned); return isNaN(v)?null:v;
+      }
+      function parseFromMarkdown(md, url){
+        var text = md;
+        var emitente = '';
+        var cnpj = '';
+        var dataBR = '';
+        var hora = '';
+        var valorTotal = null;
+        var uf = '';
+        var items = [];
+
+        var mEmit = /####\\s*\\*\\*([^*\\n]+)\\*\\*/i.exec(text);
+        if (mEmit) emitente = mEmit[1].trim();
+        if (!emitente){
+          var mEmit2 = /\\|\\s*Nome\\s*\\/\\s*Raz\\w+\\s*\\|[\\s\\S]*?\\|\\s*([^|\\n]+?)\\s*\\|\\s*\\d{8,}\\s*\\|/i.exec(text);
+          if (mEmit2) emitente = mEmit2[1].trim();
+        }
+
+        var mCNPJ = /CNPJ:\\s*([\\d\\.\\/-]+)/i.exec(text);
+        if (mCNPJ) cnpj = mCNPJ[1].replace(/\\D+/g,'');
+
+        var mUF = /\\|\\s*UF\\s*\\|[\\s\\S]*?\\|\\s*([A-Z]{2})\\s*\\|/i.exec(text);
+        if (!mUF){
+          mUF = /(,\\s*([A-Z]{2}))\\s*-?\\s*\\d{5}-\\d{3}/m.exec(text);
+        }
+        uf = (mUF && (mUF[1]||mUF[2])) ? (mUF[1] or mUF[2]).toUpperCase() : '';
+
+        var mData = /\\|\\s*Modelo\\s*\\|\\s*S[ée]rie\\s*\\|\\s*N[úu]mero\\s*\\|\\s*Data Emiss[aã]o\\s*\\|[\\s\\S]*?\\|\\s*\\d+\\s*\\|\\s*\\d+\\s*\\|\\s*\\d+\\s*\\|\\s*(\\d{2}\\/\\d{2}\\/\\d{4})\\s*(\\d{2}:\\d{2}(?::\\d{2})?)?\\s*\\|/i.exec(text);
+        if (!mData){
+          mData = /(\\d{2}\\/\\d{2}\\/\\d{4})\\s+(\\d{2}:\\d{2}(?::\\d{2})?)/.exec(text);
+        }
+        if (mData){ dataBR = mData[1]; hora = (mData[2]||'').trim(); }
+
+        var mV1 = /\\*\\*Valor total R\\$\\*\\*[\\s\\S]*?\\*\\*\\s*([0-9\\.,]+)\\s*\\*\\*/i.exec(text);
+        if (mV1) valorTotal = mdNumberBR(mV1[1]);
+        if (valorTotal==null){
+          var mV2 = /Valor\\s*total\\s*R\\$\\s*:?\\s*R\\$\\s*([0-9\\.,]+)/i.exec(text);
+          if (mV2) valorTotal = mdNumberBR(mV2[1]);
+        }
+        if (valorTotal==null){
+          var mV3 = /Valor\\s*pago\\s*R\\$[\\s\\S]*?\\*\\*\\s*([0-9\\.,]+)\\s*\\*\\*/i.exec(text);
+          if (mV3) valorTotal = mdNumberBR(mV3[1]);
+        }
+
+        var reItem = /(.*?)\\(C[oó]digo:[^)]+\\)\\s*Qtde total de [^:]+:\\s*([0-9\\.,]+)\\s*UN:\\s*([A-Z]+)\\s*Valor total R\\$:\\s*R\\$\\s*([0-9\\.,]+)/gi;
+        var im;
+        while ((im = reItem.exec(text))){
+          var desc = im[1].replace(/\\s+/g,' ').trim();
+          var qtd = mdNumberBR(im[2])||1;
+          var un = im[3].trim();
+          var vtot = mdNumberBR(im[4])||0;
+          var vun = (qtd && vtot)? vtot/qtd : null;
+          if (desc && vtot>0) items.push({ descricao: desc, quantidade: qtd, unidade: un, valor_unitario: vun, valor_total: vtot });
+        }
+
+        var chm = ( /chNFe=([\\d]{44})/i.exec(url) || /p=([\\d]{44})/i.exec(url) );
+        var chave = chm? chm[1] : '';
+
+        var dataISO = toISO(dataBR, hora);
+
+        return { emitente: emitente||'', cnpj: (cnpj||'').replace(/\\D+/g,''), documento:'', data: dataISO, data_br: dataBR||'', hora: hora||'', uf: uf||'', chave: chave||'', valor: valorTotal||0, items: items, _mode:'markdown' };
+      }
       function parseWithDOM(html, url){
+        // Fallback automático para Markdown
+        var looksLikeMarkdown = (!/<!doctype|<html[\\s>]/i.test(html)) && (/Markdown Content:|\\*\\*|^#|\\|\\s*-{3,}\\s*\\|/m.test(html));
+        if (looksLikeMarkdown) return parseFromMarkdown(html, url);
+
         const doc = new DOMParser().parseFromString(html, 'text/html');
         var emitente='', cnpj='', documento='';
         const allRows = Array.from(doc.querySelectorAll('table tr'));
         for(const tr of allRows){
           const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
           if (tds.length>=2){
-            if (!emitente && /raz[aã]o social|emitente|nome\/raza[oã]/i.test(tds[0])) emitente = tds[1];
-            if (!cnpj && /cnpj/i.test(tds[0])) cnpj = tds[1].replace(/\D+/g,'');
-            if (!documento && /(cpf.*consumidor|cpf\/cnpj.*consumidor|cpf do consumidor)/i.test(tds[0])) documento = tds[1];
-            if (!emitente && /raz[aã]o social|emitente|nome\/raza[oã]/i.test(tds[1])) emitente = tds[0];
-            if (!cnpj && /cnpj/i.test(tds[1])) cnpj = tds[0].replace(/\D+/g,'');
+            if (!emitente && /raz[aã]o social|emitente|nome\\/raza[oã]/i.test(tds[0])) emitente = tds[1];
+            if (!cnpj && /cnpj/i.test(tds[0])) cnpj = tds[1].replace(/\\D+/g,'');
+            if (!documento && /(cpf.*consumidor|cpf\\/cnpj.*consumidor|cpf do consumidor)/i.test(tds[0])) documento = tds[1];
+            if (!emitente && /raz[aã]o social|emitente|nome\\/raza[oã]/i.test(tds[1])) emitente = tds[0];
+            if (!cnpj && /cnpj/i.test(tds[1])) cnpj = tds[0].replace(/\\D+/g,'');
           }
         }
         if (!emitente){
-          let topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente');
-          if (!topo) topo = doc.querySelector('[id*="emitente" i], [id*="Razao" i], [id*="razao" i], [id*="xNome" i]');
+          const topo = doc.querySelector('.txtTopo, #u20, .emitente, header h1, h2, .nome-emitente, #nomeEmitente, [id*=\"emitente\" i], [id*=\"Razao\" i], [id*=\"razao\" i], [id*=\"xNome\" i]');
           emitente = clean(topo && topo.textContent || '');
         }
         var dataBR = '', hora = '';
@@ -333,27 +398,28 @@
           const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
           if (tds.length>=2){
             if (labels.some(function(l){ return tds[0].indexOf(l)>=0; })){
-              const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(tds[1]);
-              const hm = /(\d{2}:\d{2}:\d{2}|\d{2}:\d{2})/.exec(tds[1]);
+              const dm = /(\\d{2}\\/\\d{2}\\/\\d{4})/.exec(tds[1]);
+              const hm = /(\\d{2}:\\d{2}:\\d{2}|\\d{2}:\\d{2})/.exec(tds[1]);
               if (dm) dataBR = dm[1];
               if (hm) hora = hm[1];
             }
           }
         }
         if (!dataBR){
-          const m = /Data\/Hora da Emiss[aã]o[^<]*>\s*([^<]+)/i.exec(html);
-          if (m){ const dm = /(\d{2}\/\d{2}\/\d{4})/.exec(m[1]); const hm = /(\d{2}:\d{2}(:\d{2})?)/.exec(m[1]); dataBR = dm?dm[1]:''; hora = hm?hm[1]:''; }
+          const m = /Data\\/Hora da Emiss[aã]o[^<]*>\\s*([^<]+)/i.exec(html);
+          if (m){ const dm = /(\\d{2}\\/\\d{2}\\/\\d{4})/.exec(m[1]); const hm = /(\\d{2}:\\d{2}(:\\d{2})?)/.exec(m[1]); dataBR = dm?dm[1]:''; hora = hm?hm[1]:''; }
         }
         const dataISO = toISO(dataBR, hora);
         var valorTotal = null;
         for (const tr of allRows){
           const tds = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.innerText||td.textContent||''); });
-          if (tds.length>=2 && /valor\s*(total|a pagar)/i.test(tds[0])){ valorTotal = brToNumber(tds[1]); break; }
+          if (tds.length>=2 && /valor\\s*(total|a pagar)/i.test(tds[0])){ valorTotal = brToNumber(tds[1]); break; }
         }
         if (valorTotal==null){
-          const nodes = Array.from(doc.querySelectorAll('td, span, div')).map(function(e){ return clean(e.textContent); });
-          const totalSpan = nodes.find(function(t){ return /^total\s*r\$/i.test(t); });
-          if (totalSpan){ const num = totalSpan.replace(/[^0-9\.,]/g,''); valorTotal = brToNumber(num); }
+          const nodes = Array.from(doc.querySelectorAll('td, th, span, div, b, strong')).map(function(e){ return clean(e.textContent); });
+          let totalLine = nodes.find(function(t){ return /valor\\s*(a\\s*)?pagar/i.test(t); });
+          if (!totalLine) totalLine = nodes.find(function(t){ return /^total\\s*r\\$/i.test(t); });
+          if (totalLine){ const num = totalLine.replace(/[^0-9\\.,]/g,''); valorTotal = brToNumber(num); }
         }
         if (valorTotal==null) valorTotal = 0;
         const items = [];
@@ -362,23 +428,23 @@
           const headers = Array.from(table.querySelectorAll('th')).map(function(th){ return clean(th.textContent); });
           if (headers.length){
             const hasDesc = headers.some(function(h){ return /descri[cç][aã]o|produto/i.test(h); });
-            const hasVTotal = headers.some(function(h){ return /valor\s*total|vl\.?\s*total/i.test(h); });
+            const hasVTotal = headers.some(function(h){ return /valor\\s*total|vl\\.?\\s*total/i.test(h); });
             if (hasDesc && hasVTotal){
               const trs = Array.from(table.querySelectorAll('tr'));
               for (const tr of trs.slice(1)){
                 const cells = Array.from(tr.querySelectorAll('td')).map(function(td){ return clean(td.textContent); });
                 if (cells.length<2) continue;
-                const desc = cells[0]; if (!desc || /\bdescri[cç][aã]o\b/i.test(desc)) continue;
+                const desc = cells[0]; if (!desc || /\\bdescri[cç][aã]o\\b/i.test(desc)) continue;
                 var qtd = null, un = '', vun = null, vtot = null;
                 headers.forEach(function(h,idx){
                   const val = cells[idx] || '';
                   if (/qtde|quantidade/i.test(h)) qtd = brToNumber(val);
-                  if (/unidade|un\b|und/i.test(h)) un = val;
-                  if (/valor\s*unit|vl\.?\s*unit/i.test(h)) vun = brToNumber(val);
-                  if (/valor\s*total|vl\.?\s*total/i.test(h)) vtot = brToNumber(val);
+                  if (/unidade|un\\b|und/i.test(h)) un = val;
+                  if (/valor\\s*unit|vl\\.?\\s*unit/i.test(h)) vun = brToNumber(val);
+                  if (/valor\\s*total|vl\\.?\\s*total/i.test(h)) vtot = brToNumber(val);
                 });
-                if (vtot==null){ const lastNum = cells.slice().reverse().find(function(c){ return /[\d\.,]/.test(c); }); vtot = brToNumber(lastNum); }
-                if (qtd==null){ const n = cells.find(function(c){ return /^\d+([\.,]\d+)?$/.test(c); }); qtd = brToNumber(n)||1; }
+                if (vtot==null){ const lastNum = cells.slice().reverse().find(function(c){ return /[\\d\\.,]/.test(c); }); vtot = brToNumber(lastNum); }
+                if (qtd==null){ const n = cells.find(function(c){ return /^\\d+([\\.,]\\d+)?$/.test(c); }); qtd = brToNumber(n)||1; }
                 if (!un){ const u = cells.find(function(c){ return /^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c); }); un = u||''; }
                 if (vun==null && vtot!=null && qtd){ vun = (vtot && qtd)? (vtot/qtd) : null; }
                 if (desc && vtot!=null && vtot>0) items.push({ descricao: desc, quantidade: qtd||1, unidade: un||'', valor_unitario: vun, valor_total: vtot });
@@ -393,15 +459,15 @@
             if (cells.length<3) continue;
             const desc = cells[0];
             const vtot = brToNumber(cells[cells.length-1]);
-            const qtd = brToNumber(cells.find(function(c){ return /^\d+([\.,]\d+)?$/.test(c); })) || 1;
+            const qtd = brToNumber(cells.find(function(c){ return /^\\d+([\\.,]\\d+)?$/.test(c); })) || 1;
             const un = (cells.find(function(c){ return /^(UN|UND|KG|L|UNID|PC|PÇ|G|ML|CX|FD|SC|DZ|M|LT)$/i.test(c); }) || '');
             const vun = (vtot && qtd) ? vtot/qtd : null;
             if (desc && vtot) items.push({ descricao: desc, quantidade: qtd, unidade: un, valor_unitario: vun, valor_total: vtot });
           }
         }
-        const ufm = /\/\/(\w{2})\./i.exec(url); const uf = ufm && ufm[1] ? ufm[1].toUpperCase() : '';
-        const chm = ( /chNFe=([\d]{44})/i.exec(url) || /p=([\d]{44})/i.exec(url) ); const chave = chm ? chm[1] : '';
-        return { emitente: emitente, cnpj: (cnpj||'').replace(/\D+/g,''), documento: documento, data: dataISO, data_br: dataBR, hora: hora, uf: uf, chave: chave, valor: valorTotal, items: items };
+        const ufm = /\\/\\/(\\w{2})\\./i.exec(url); const uf = ufm && ufm[1] ? ufm[1].toUpperCase() : '';
+        const chm = ( /chNFe=([\\d]{44})/i.exec(url) || /p=([\\d]{44})/i.exec(url) ); const chave = chm ? chm[1] : '';
+        return { emitente: emitente, cnpj: (cnpj||'').replace(/\\D+/g,''), documento: documento, data: dataISO, data_br: dataBR, hora: hora, uf: uf, chave: chave, valor: valorTotal, items: items, _mode:'html' };
       }
       async function getHtml(url){
         var cfg = (window.FinStore && FinStore.loadCfg && FinStore.loadCfg()) || {};
@@ -420,264 +486,252 @@
         const html = await getHtml(url);
         return parseWithDOM(html, url);
       }
-      async function debugRaw(url){ const html = await getHtml(url); const data = parseWithDOM(html,url); const title=(/<title>([^<]*)<\/title>/i.exec(html)||[])[1]||''; return { parsed:data, title, length: html.length, html_head: html.slice(0,12000), html_tail: html.slice(-8000) }; }
+      async function debugRaw(url){
+        const html = await getHtml(url); const parsed = parseWithDOM(html, url);
+        const title=(/<title>([^<]*)<\\/title>/i.exec(html)||[])[1]||'';
+        return { parsed, title, length: html.length, mode: parsed._mode||'unknown', head: html.slice(0, 12000), tail: html.slice(-8000) };
+      }
       window.NFCE = { processNfceUrl: processNfceUrl, debug: debug, debugRaw: debugRaw };
     })();
   </script>
 
-  <!-- main.js inline -->
+  <!-- main.js -->
   <script>
-    (function(){
-      var pingValEl = null;
-      function setPing(msg){ if (!pingValEl) pingValEl = document.getElementById('pingVal'); if (pingValEl) pingValEl.textContent = msg; }
+    document.addEventListener('DOMContentLoaded', function(){
+      try{
+        var boot = document.getElementById('boot'); if (boot) boot.textContent = 'Zarya Finance v2.5.0 — pronto';
+        var currentStream=null, currentDeviceId=null, detector=null, zxingReader=null;
+        var period = { mode:'month', start:null, end:null };
 
-      document.addEventListener('click', function(){ setPing(new Date().toLocaleTimeString()); });
+        function switchTab(id){
+          var tabs = document.querySelectorAll('nav button'); tabs.forEach(function(b){ b.classList.toggle('active', b.getAttribute('data-tab')===id); });
+          var secs = document.querySelectorAll('main section'); secs.forEach(function(s){ s.classList.toggle('active', s.id===id); });
+          if (id==='reports') renderReports();
+        }
+        document.addEventListener('click', function(e){
+          var t=e.target;
+          if (t.matches && t.matches('nav button')) switchTab(t.getAttribute('data-tab'));
+          if (t.id==='chipMonth'){ period.mode='month'; refreshAll(); }
+          if (t.id==='chip30'){ period.mode='last30'; refreshAll(); }
+          if (t.id==='chipYear'){ period.mode='year'; refreshAll(); }
+        });
 
-      document.addEventListener('DOMContentLoaded', function(){
-        try{
-          var boot = document.getElementById('boot'); if (boot) boot.textContent = 'Zarya Finance v2.4.2 — pronto';
-          var currentStream=null, currentDeviceId=null, detector=null, zxingReader=null;
-          var period = { mode:'month', start:null, end:null };
+        function ensureDetector(){ if ('BarcodeDetector' in window){ detector = new BarcodeDetector({ formats: ['qr_code'] }); } else detector=null; return detector; }
+        function video(){ return document.getElementById('video'); }
+        function scanStatus(){ return document.getElementById('scanStatus'); }
+        function result(){ return document.getElementById('result'); }
+        function esc(s){ var map = {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}; return String(s).replace(/[&<>"]/g,function(ch){return map[ch];}).replace(/'/g,'&#39;'); }
+        function fmtDate(s){ var d=new Date(s); return isNaN(d)? s : d.toLocaleString(); }
 
-          function switchTab(id){
-            var tabs = document.querySelectorAll('nav button'); for (var i=0;i<tabs.length;i++){ tabs[i].classList.toggle('active', tabs[i].getAttribute('data-tab')===id); }
-            var secs = document.querySelectorAll('main section'); for (var j=0;j<secs.length;j++){ secs[j].classList.toggle('active', secs[j].id===id); }
-            if (id==='reports') renderReports();
-          }
-          document.addEventListener('click', function(e){
-            var t=e.target;
-            if (t.matches && t.matches('nav button')) switchTab(t.getAttribute('data-tab'));
-            if (t.id==='chipMonth'){ period.mode='month'; refreshAll(); }
-            if (t.id==='chip30'){ period.mode='last30'; refreshAll(); }
-            if (t.id==='chipYear'){ period.mode='year'; refreshAll(); }
-          });
+        function listCameras(){ return navigator.mediaDevices.enumerateDevices().then(function(d){ return d.filter(function(x){ return x.kind==='videoinput'; }); }); }
+        function stopCam(){ if (currentStream){ currentStream.getTracks().forEach(function(t){ t.stop(); }); currentStream=null; } var st=scanStatus(); if (st) st.textContent='Status: inativo'; }
 
-          function ensureDetector(){ if ('BarcodeDetector' in window){ detector = new BarcodeDetector({ formats: ['qr_code'] }); } else detector=null; return detector; }
-          function video(){ return document.getElementById('video'); }
-          function scanStatus(){ return document.getElementById('scanStatus'); }
-          function result(){ return document.getElementById('result'); }
-          function esc(s){
-            var map = {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"};
-            return String(s).replace(/[&<>"]/g, function(ch){ return map[ch]; }).replace(/'/g,"&#39;");
-          }
-          function fmtDate(s){ var d=new Date(s); return isNaN(d)? s : d.toLocaleString(); }
-
-          function listCameras(){ return navigator.mediaDevices.enumerateDevices().then(function(d){ return d.filter(function(x){ return x.kind==='videoinput'; }); }); }
-          function stopCam(){ if (currentStream){ currentStream.getTracks().forEach(function(t){ t.stop(); }); currentStream=null; } var st=scanStatus(); if (st) st.textContent='Status: inativo'; }
-
-          function loopScan(){
-            var v=video(); if (!detector || !v || v.readyState<2){ requestAnimationFrame(loopScan); return; }
-            createImageBitmap(v).then(function(bmp){
-              detector.detect(bmp).then(function(codes){
-                if (codes && codes.length){ var raw=codes[0].rawValue; stopCam(); if (result()) result().textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
-                else requestAnimationFrame(loopScan);
-              }).catch(function(){ requestAnimationFrame(loopScan); });
+        function loopScan(){
+          var v=video(); if (!detector || !v || v.readyState<2){ requestAnimationFrame(loopScan); return; }
+          createImageBitmap(v).then(function(bmp){
+            detector.detect(bmp).then(function(codes){
+              if (codes && codes.length){ var raw=codes[0].rawValue; stopCam(); if (result()) result().textContent='QR detectado: '+raw+'\\nProcessando...'; handleQr(raw); }
+              else requestAnimationFrame(loopScan);
             }).catch(function(){ requestAnimationFrame(loopScan); });
-          }
+          }).catch(function(){ requestAnimationFrame(loopScan); });
+        }
 
-          function startCam(preferBack){
-            if (preferBack===undefined) preferBack=true;
-            ensureDetector();
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: preferBack?{ideal:'environment'}:{ideal:'user'} }, audio:false }).then(function(stream){
-              currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play().then(function(){
-                listCameras().then(function(cams){
-                  var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); });
-                  if (back && preferBack){ switchToDevice(back.deviceId); }
-                });
-                var st=scanStatus(); if (st) st.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (sem detector nativo; use Leitor Alternativo)';
-                if (detector) loopScan();
+        function startCam(preferBack){
+          if (preferBack===undefined) preferBack=true;
+          ensureDetector();
+          navigator.mediaDevices.getUserMedia({ video: { facingMode: preferBack?{ideal:'environment'}:{ideal:'user'} }, audio:false }).then(function(stream){
+            currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play().then(function(){
+              listCameras().then(function(cams){
+                var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); });
+                if (back && preferBack){ switchToDevice(back.deviceId); }
               });
-            }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro: '+e.message; });
-          }
+              var st=scanStatus(); if (st) st.textContent = detector ? 'Status: câmera ativa' : 'Status: câmera ativa (sem detector nativo; use Leitor Alternativo)';
+              if (detector) loopScan();
+            });
+          }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro: '+e.message; });
+        }
 
-          function switchToDevice(deviceId){
-            stopCam(); currentDeviceId=deviceId;
-            navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio:false }).then(function(stream){
-              currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play();
-            }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro ao trocar câmera: '+e.message; });
-          }
+        function switchToDevice(deviceId){
+          stopCam(); currentDeviceId=deviceId;
+          navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: deviceId } }, audio:false }).then(function(stream){
+            currentStream=stream; var v=video(); if(!v) return; v.srcObject=stream; v.play();
+          }).catch(function(e){ var st=scanStatus(); if (st) st.textContent='Erro ao trocar câmera: '+e.message; });
+        }
 
-          function startZXing(){
-            try{
-              var ZX = window.ZXing; if (!ZX) throw new Error('Biblioteca ZXing não carregou');
-              var Reader = ZX.BrowserMultiFormatReader;
-              zxingReader = new Reader();
-              zxingReader.listVideoInputDevices().then(function(cams){
-                var deviceId = cams[0] && cams[0].deviceId; var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); }); if (back) deviceId=back.deviceId;
-                var v=video(); if (!v) return;
-                zxingReader.decodeFromVideoDevice(deviceId, v, function(res,err){
-                  if (res){ zxingReader.reset(); stopCam(); if (result()) result().textContent='QR detectado: '+res.getText()+'\nProcessando...'; handleQr(res.getText()); }
-                });
-                var st=scanStatus(); if (st) st.textContent='ZXing: leitor alternativo ativo';
+        function startZXing(){
+          try{
+            var ZX = window.ZXing; if (!ZX) throw new Error('Biblioteca ZXing não carregou');
+            var Reader = ZX.BrowserMultiFormatReader;
+            zxingReader = new Reader();
+            zxingReader.listVideoInputDevices().then(function(cams){
+              var deviceId = cams[0] && cams[0].deviceId; var back = cams.find(function(c){ return /back|trás|tras|rear/i.test(c.label); }); if (back) deviceId=back.deviceId;
+              var v=video(); if (!v) return;
+              zxingReader.decodeFromVideoDevice(deviceId, v, function(res,err){
+                if (res){ zxingReader.reset(); stopCam(); if (result()) result().textContent='QR detectado: '+res.getText()+'\\nProcessando...'; handleQr(res.getText()); }
               });
-            }catch(e){ var st=scanStatus(); if (st) st.textContent='ZXing erro: '+e.message; }
-          }
+              var st=scanStatus(); if (st) st.textContent='ZXing: leitor alternativo ativo';
+            });
+          }catch(e){ var st=scanStatus(); if (st) st.textContent='ZXing erro: '+e.message; }
+        }
 
-          var btnStart = document.getElementById('btnStart');
-          var btnSwitch = document.getElementById('btnSwitchCam');
-          var btnZXing = document.getElementById('btnZXing');
-          var btnStop = document.getElementById('btnStop');
-          var btnSnap = document.getElementById('btnSnap');
-          var btnProcessUrl = document.getElementById('btnProcessUrl');
-          if (btnStart) btnStart.addEventListener('click', function(){ startCam(true); });
-          if (btnSwitch) btnSwitch.addEventListener('click', function(){
-            listCameras().then(function(cams){ if (!cams.length) return alert('Nenhuma câmera encontrada'); var idx = cams.findIndex(function(c){ return c.deviceId===currentDeviceId; }); var next = cams[(idx+1+cams.length)%cams.length]; switchToDevice(next.deviceId); });
-          });
-          if (btnZXing) btnZXing.addEventListener('click', startZXing);
-          if (btnStop) btnStop.addEventListener('click', stopCam);
-          if (btnSnap) btnSnap.addEventListener('click', function(){
-            var input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
-            input.onchange=function(){ var file=input.files[0]; if (!file) return;
-              var blobUrl=URL.createObjectURL(file); var img=new Image(); img.onload=function(){
-                try{
-                  var ZX = window.ZXing; if (ZX){
-                    var Reader = ZX.BrowserMultiFormatReader;
-                    var r = new Reader();
-                    var canvas=document.createElement('canvas'); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
-                    var ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
-                    try{ var ls=r.createLuminanceSource(canvas,0,0,canvas.width,canvas.height); var bb=r.createBinaryBitmap(ls); var res=r.decodeBinaryBitmap(bb); if (res){ if (result()) result().textContent='QR detectado: '+res.getText()+'\nProcessando...'; handleQr(res.getText()); URL.revokeObjectURL(blobUrl); return; } }catch(err){}
-                  }
-                  if (!('BarcodeDetector' in window)){ if (result()) result().textContent='Sem ZXing e sem detector nativo. Cole a URL do QR.'; URL.revokeObjectURL(blobUrl); return; }
-                  createImageBitmap(img).then(function(bitmap){ detector.detect(bitmap).then(function(codes){
-                    URL.revokeObjectURL(blobUrl);
-                    if (codes && codes.length){ var raw=codes[0].rawValue; if (result()) result().textContent='QR detectado: '+raw+'\nProcessando...'; handleQr(raw); }
-                    else if (result()) result().textContent='Nenhum QR detectado na imagem.';
-                  }); });
-                }catch(e){ if (result()) result().textContent='Erro: '+e.message; }
-              }; img.src=blobUrl;
-            };
-            input.click();
-          });
-          if (btnProcessUrl) btnProcessUrl.addEventListener('click', function(){
-            var q = document.getElementById('qrUrl').value.trim(); if (!q){ if (result()) result().textContent='Informe a URL do QR.'; return; } handleQr(q);
-          });
+        var btnStart = document.getElementById('btnStart');
+        var btnSwitch = document.getElementById('btnSwitchCam');
+        var btnZXing = document.getElementById('btnZXing');
+        var btnStop = document.getElementById('btnStop');
+        var btnSnap = document.getElementById('btnSnap');
+        var btnProcessUrl = document.getElementById('btnProcessUrl');
+        if (btnStart) btnStart.addEventListener('click', function(){ startCam(true); });
+        if (btnSwitch) btnSwitch.addEventListener('click', function(){
+          listCameras().then(function(cams){ if (!cams.length) return alert('Nenhuma câmera encontrada'); var idx = cams.findIndex(function(c){ return c.deviceId===currentDeviceId; }); var next = cams[(idx+1+cams.length)%cams.length]; switchToDevice(next.deviceId); });
+        });
+        if (btnZXing) btnZXing.addEventListener('click', startZXing);
+        if (btnStop) btnStop.addEventListener('click', stopCam);
+        if (btnSnap) btnSnap.addEventListener('click', function(){
+          var input=document.createElement('input'); input.type='file'; input.accept='image/*'; input.capture='environment';
+          input.onchange=function(){ var file=input.files[0]; if (!file) return;
+            var blobUrl=URL.createObjectURL(file); var img=new Image(); img.onload=function(){
+              try{
+                var ZX = window.ZXing; if (ZX){
+                  var Reader = ZX.BrowserMultiFormatReader;
+                  var r = new Reader();
+                  var canvas=document.createElement('canvas'); canvas.width=img.naturalWidth; canvas.height=img.naturalHeight;
+                  var ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
+                  try{ var ls=r.createLuminanceSource(canvas,0,0,canvas.width,canvas.height); var bb=r.createBinaryBitmap(ls); var res=r.decodeBinaryBitmap(bb); if (res){ if (result()) result().textContent='QR detectado: '+res.getText()+'\\nProcessando...'; handleQr(res.getText()); URL.revokeObjectURL(blobUrl); return; } }catch(err){}
+                }
+                if (!('BarcodeDetector' in window)){ if (result()) result().textContent='Sem ZXing e sem detector nativo. Cole a URL do QR.'; URL.revokeObjectURL(blobUrl); return; }
+                createImageBitmap(img).then(function(bitmap){ detector.detect(bitmap).then(function(codes){
+                  URL.revokeObjectURL(blobUrl);
+                  if (codes && codes.length){ var raw=codes[0].rawValue; if (result()) result().textContent='QR detectado: '+raw+'\\nProcessando...'; handleQr(raw); }
+                  else if (result()) result().textContent='Nenhum QR detectado na imagem.';
+                }); });
+              }catch(e){ if (result()) result().textContent='Erro: '+e.message; }
+            }; img.src=blobUrl;
+          };
+          input.click();
+        });
+        if (btnProcessUrl) btnProcessUrl.addEventListener('click', function(){
+          var q = document.getElementById('qrUrl').value.trim(); if (!q){ if (result()) result().textContent='Informe a URL do QR.'; return; } handleQr(q);
+        });
 
-          function handleQr(url){
-            window.NFCE.processNfceUrl(url).then(function(rec){
-              if (result()) result().textContent='OK! Nota salva:\n'+JSON.stringify(rec,null,2); refreshReceiptsTable();
-            }).catch(function(e){ if (result()) result().textContent='Falha: '+e.message; });
-          }
+        function handleQr(url){
+          window.NFCE.processNfceUrl(url).then(function(rec){
+            if (result()) result().textContent='OK! Nota salva:\\n'+JSON.stringify(rec,null,2); refreshReceiptsTable();
+          }).catch(function(e){ if (result()) result().textContent='Falha: '+e.message; });
+        }
 
-          // DEBUG
-          var dbgBtn = document.getElementById('btnDbgTest');
-          if (dbgBtn) dbgBtn.addEventListener('click', function(){
-            var url = (document.getElementById('dbgUrl') && document.getElementById('dbgUrl').value || '').trim();
-            var outEl = document.getElementById('dbgOut');
-            if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
-            window.NFCE.debugRaw(url).then(function(pack){
-              if (outEl) outEl.textContent = JSON.stringify(pack, null, 2);
-              window.__DBG_HTML_HEAD = pack.html_head; window.__DBG_HTML_TAIL = pack.html_tail;
-            }).catch(function(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; });
-          });
-          var dbgCopy = document.getElementById('btnDbgCopy');
-          if (dbgCopy) dbgCopy.addEventListener('click', function(){
-            var head = window.__DBG_HTML_HEAD||''; var tail=window.__DBG_HTML_TAIL||'';
-            var txt = head + '\n...[omissis]...\n' + tail;
-            navigator.clipboard.writeText(txt).then(function(){ alert('Trechos de HTML copiados para a área de transferência.'); }).catch(function(e){ alert('Falha ao copiar: '+e.message); });
-          });
+        // DEBUG
+        var dbgBtn = document.getElementById('btnDbgTest');
+        if (dbgBtn) dbgBtn.addEventListener('click', function(){
+          var url = (document.getElementById('dbgUrl') && document.getElementById('dbgUrl').value || '').trim();
+          var outEl = document.getElementById('dbgOut');
+          if (!url){ if(outEl) outEl.textContent='Informe a URL.'; return; }
+          window.NFCE.debugRaw(url).then(function(pack){
+            if (outEl) outEl.textContent = JSON.stringify(pack, null, 2);
+          }).catch(function(e){ if(outEl) outEl.textContent = 'Erro: '+e.message; });
+        });
 
-          // CONFIG
-          var btnSaveCfg = document.getElementById('btnSaveCfg');
-          var btnClearAll = document.getElementById('btnClearAll');
-          if (btnSaveCfg) btnSaveCfg.addEventListener('click', function(){
-            var endpoint=document.getElementById('endpoint').value.trim(); var uf=document.getElementById('uf').value.trim();
-            var mode=(document.querySelector('input[name="parserMode"]:checked') && document.querySelector('input[name="parserMode"]:checked').value) || 'proxy';
-            var cfg=FinStore.loadCfg(); cfg.endpoint=endpoint; cfg.uf=uf; cfg.parserMode=mode; FinStore.saveCfg(cfg);
-            var s=document.getElementById('cfgStatus'); if (s) s.textContent='Configurações salvas.';
-          });
-          if (btnClearAll) btnClearAll.addEventListener('click', function(){
-            if(!confirm('Apagar todos os dados locais?')) return; FinStore.wipe();
-            var s=document.getElementById('cfgStatus'); if (s) s.textContent='Dados limpos.'; refreshAll();
-          });
-          var btnAddRule = document.getElementById('btnAddRule');
-          if (btnAddRule) btnAddRule.addEventListener('click', function(){
-            var p=document.getElementById('rulePattern').value.trim(); var c=document.getElementById('ruleCat').value.trim(); if(!p||!c) return alert('Preencha padrão e categoria.');
-            var rules=FinStore.loadRules(); rules.unshift({pattern:p, categoria:c}); FinStore.saveRules(rules); document.getElementById('rulePattern').value=''; document.getElementById('ruleCat').value=''; renderRulesTable(); renderReports();
-          });
+        // CONFIG
+        var btnSaveCfg = document.getElementById('btnSaveCfg');
+        var btnClearAll = document.getElementById('btnClearAll');
+        if (btnSaveCfg) btnSaveCfg.addEventListener('click', function(){
+          var endpoint=document.getElementById('endpoint').value.trim(); var uf=document.getElementById('uf').value.trim();
+          var mode=(document.querySelector('input[name=\"parserMode\"]:checked') && document.querySelector('input[name=\"parserMode\"]:checked').value) || 'proxy';
+          var cfg=FinStore.loadCfg(); cfg.endpoint=endpoint; cfg.uf=uf; cfg.parserMode=mode; FinStore.saveCfg(cfg);
+          var s=document.getElementById('cfgStatus'); if (s) s.textContent='Configurações salvas.';
+        });
+        if (btnClearAll) btnClearAll.addEventListener('click', function(){
+          if(!confirm('Apagar todos os dados locais?')) return; FinStore.wipe();
+          var s=document.getElementById('cfgStatus'); if (s) s.textContent='Dados limpos.'; refreshAll();
+        });
+        var btnAddRule = document.getElementById('btnAddRule');
+        if (btnAddRule) btnAddRule.addEventListener('click', function(){
+          var p=document.getElementById('rulePattern').value.trim(); var c=document.getElementById('ruleCat').value.trim(); if(!p||!c) return alert('Preencha padrão e categoria.');
+          var rules=FinStore.loadRules(); rules.unshift({pattern:p, categoria:c}); FinStore.saveRules(rules); document.getElementById('rulePattern').value=''; document.getElementById('ruleCat').value=''; renderRulesTable(); renderReports();
+        });
 
-          function refreshReceiptsTable(){
-            var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
-            var tb=document.querySelector('#tblReceipts tbody'); if (!tb) return; tb.innerHTML='';
-            for (var i=0;i<arr.length;i++){
-              var r=arr[i];
-              var tr=document.createElement('tr');
-              tr.innerHTML='<td>'+fmtDate(r.data)+'</td><td>'+esc(r.emitente||'')+'</td><td>R$ '+Number(r.valor||0).toFixed(2)+'</td><td>'+((r.itens||[]).length)+'</td><td>'+(r.uf||'')+'</td>';
-              tb.appendChild(tr);
-            }
-          }
-          var btnRefRec = document.getElementById('btnRefreshReceipts');
-          var btnExpRec = document.getElementById('btnExportReceipts');
-          if (btnRefRec) btnRefRec.addEventListener('click', refreshReceiptsTable);
-          if (btnExpRec) btnExpRec.addEventListener('click', function(){
-            var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
-            var rows=[['data','emitente','cnpj','documento','valor','uf','chave','url','itens']];
-            for (var i=0;i<arr.length;i++){ var r=arr[i]; rows.push([r.data,r.emitente,r.cnpj,r.documento||'',r.valor,r.uf,r.chave,r.url,(r.itens||[]).length]); }
-            exportCSV('receipts.csv', rows);
+        function refreshReceiptsTable(){
+          var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
+          var tb=document.querySelector('#tblReceipts tbody'); if (!tb) return; tb.innerHTML='';
+          arr.forEach(function(r){
+            var tr=document.createElement('tr');
+            tr.innerHTML='<td>'+fmtDate(r.data)+'</td><td>'+esc(r.emitente||'')+'</td><td>R$ '+Number(r.valor||0).toFixed(2)+'</td><td>'+((r.itens||[]).length)+'</td><td>'+(r.uf||'')+'</td>';
+            tb.appendChild(tr);
           });
+        }
+        var btnRefRec = document.getElementById('btnRefreshReceipts');
+        var btnExpRec = document.getElementById('btnExportReceipts');
+        if (btnRefRec) btnRefRec.addEventListener('click', refreshReceiptsTable);
+        if (btnExpRec) btnExpRec.addEventListener('click', function(){
+          var arr=FinStore.loadReceipts().filter(function(r){ return inPeriod(r.data, period); });
+          var rows=[['data','emitente','cnpj','documento','valor','uf','chave','url','itens']];
+          arr.forEach(function(r){ rows.push([r.data,r.emitente,r.cnpj,r.documento||'',r.valor,r.uf,r.chave,r.url,(r.itens||[]).length]); });
+          exportCSV('receipts.csv', rows);
+        });
 
-          function refreshTxs(){
-            var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var tb=document.querySelector('#tblTxs tbody'); if(!tb) return; tb.innerHTML='';
-            for (var i=0;i<arr.length;i++){ var t=arr[i]; var tr=document.createElement('tr'); tr.innerHTML='<td>'+fmtDate(t.data)+'</td><td>'+esc(t.descricao||'')+'</td><td>R$ '+Number(t.valor||0).toFixed(2)+'</td><td>'+t.tipo||''+'</td>'; tb.appendChild(tr); }
-          }
-          var btnImp = document.getElementById('btnImportOfx');
-          var btnExpTxs = document.getElementById('btnExportTxs');
-          if (btnImp) btnImp.addEventListener('click', function(){
-            var f=document.getElementById('ofx').files[0]; var st=document.getElementById('ofxStatus'); if(!f){ if(st) st.textContent='Nenhum arquivo selecionado.'; return; }
-            f.text().then(function(text){
-              parseOFX(text).then(function(txs){
-                var cur=FinStore.loadTxs(); FinStore.saveTxs(txs.concat(cur));
-                if(st) st.textContent='Importadas '+txs.length+' transações.'; refreshTxs();
-              });
+        function refreshTxs(){
+          var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var tb=document.querySelector('#tblTxs tbody'); if(!tb) return; tb.innerHTML='';
+          arr.forEach(function(t){
+            var tr=document.createElement('tr'); tr.innerHTML='<td>'+fmtDate(t.data)+'</td><td>'+esc(t.descricao||'')+'</td><td>R$ '+Number(t.valor||0).toFixed(2)+'</td><td>'+t.tipo||''+'</td>'; tb.appendChild(tr);
+          });
+        }
+        var btnImp = document.getElementById('btnImportOfx');
+        var btnExpTxs = document.getElementById('btnExportTxs');
+        if (btnImp) btnImp.addEventListener('click', function(){
+          var f=document.getElementById('ofx').files[0]; var st=document.getElementById('ofxStatus'); if(!f){ if(st) st.textContent='Nenhum arquivo selecionado.'; return; }
+          f.text().then(function(text){
+            parseOFX(text).then(function(txs){
+              var cur=FinStore.loadTxs(); FinStore.saveTxs(txs.concat(cur));
+              if(st) st.textContent='Importadas '+txs.length+' transações.'; refreshTxs();
             });
           });
-          if (btnExpTxs) btnExpTxs.addEventListener('click', function(){
-            var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var rows=[['data','descricao','valor','tipo','categoria']];
-            for (var i=0;i<arr.length;i++){ var t=arr[i]; rows.push([t.data,t.descricao,t.valor,t.tipo,categorize(t.descricao)]); } exportCSV('transacoes.csv', rows);
+        });
+        if (btnExpTxs) btnExpTxs.addEventListener('click', function(){
+          var arr=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); }); var rows=[['data','descricao','valor','tipo','categoria']];
+          arr.forEach(function(t){ rows.push([t.data,t.descricao,t.valor,t.tipo,categorize(t.descricao)]); }); exportCSV('transacoes.csv', rows);
+        });
+
+        var chart1=null, chart2=null;
+        function renderReports(){
+          var c1=document.getElementById('chartMes'); var c2=document.getElementById('chartCat'); if(!c1||!c2) return;
+          var ctx1=c1.getContext('2d'); var ctx2=c2.getContext('2d');
+          var txs=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); });
+          var byMonth={}, byCat={};
+          txs.forEach(function(t){
+            if (t.tipo!=='DEBITO') return;
+            var d=new Date(t.data); if (isNaN(d)) return; var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); byMonth[k]=(byMonth[k]||0)+Math.abs(t.valor||0); var cat=categorize(t.descricao); byCat[cat]=(byCat[cat]||0)+Math.abs(t.valor||0);
           });
-
-          // Reports
-          var chart1=null, chart2=null;
-          function renderReports(){
-            var c1=document.getElementById('chartMes'); var c2=document.getElementById('chartCat'); if(!c1||!c2) return;
-            var ctx1=c1.getContext('2d'); var ctx2=c2.getContext('2d');
-            var txs=FinStore.loadTxs().filter(function(t){ return inPeriod(t.data, period); });
-            var byMonth={}, byCat={};
-            for (var i=0;i<txs.length;i++){
-              var t=txs[i]; if (t.tipo!=='DEBITO') continue; var d=new Date(t.data); if (isNaN(d)) continue; var k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); byMonth[k]=(byMonth[k]||0)+Math.abs(t.valor||0); var cat=categorize(t.descricao); byCat[cat]=(byCat[cat]||0)+Math.abs(t.valor||0);
-            }
-            var labelsM=Object.keys(byMonth).sort(); var dataM=labelsM.map(function(k){ return Number(byMonth[k].toFixed(2)); });
-            var labelsC=Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }); var dataC=labelsC.map(function(k){ return Number(byCat[k].toFixed(2)); });
-            if (chart1) chart1.destroy(); if (chart2) chart2.destroy();
-            chart1=new Chart(ctx1,{type:'bar',data:{labels:labelsM,datasets:[{label:'Despesas por mês (R$)',data:dataM}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
-            chart2=new Chart(ctx2,{type:'doughnut',data:{labels:labelsC,datasets:[{data:dataC}]} });
-          }
-
-          function renderRulesTable(){
-            var rules=FinStore.loadRules(); var tb=document.querySelector('#tblRules tbody'); if(!tb) return; tb.innerHTML='';
-            for (var i=0;i<rules.length;i++){
-              var r=rules[i]; var tr=document.createElement('tr'); tr.innerHTML='<td>'+r.pattern+'</td><td>'+r.categoria+'</td><td><button data-i="'+i+'" class="btn btnDelRule">Excluir</button></td>'; tb.appendChild(tr);
-            }
-            var dels=document.querySelectorAll('.btnDelRule');
-            for (var j=0;j<dels.length;j++){ dels[j].addEventListener('click',function(e){ var i=Number(e.target.getAttribute('data-i')); var arr=FinStore.loadRules(); arr.splice(i,1); FinStore.saveRules(arr); renderRulesTable(); renderReports(); }); }
-          }
-
-          function refreshAll(){ refreshReceiptsTable(); refreshTxs(); if (document.getElementById('reports') && document.getElementById('reports').classList.contains('active')) renderReports(); renderRulesTable(); }
-
-          (function init(){
-            var cfg=FinStore.loadCfg(); var ep=document.getElementById('endpoint'); if (ep) ep.value=cfg.endpoint||'';
-            var uf=document.getElementById('uf'); if (uf) uf.value=cfg.uf||'MG';
-            var mode=cfg.parserMode||'proxy'; var r=document.querySelector('input[name="parserMode"][value="'+mode+'"]'); if(r) r.checked=true;
-            if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
-            refreshAll();
-          })();
-
-        }catch(err){
-          console.error(err);
-          var el=document.getElementById('err'); var pre=document.getElementById('errlog');
-          if (el && pre){ pre.textContent=String(err && err.stack || err); el.style.display='block'; }
+          var labelsM=Object.keys(byMonth).sort(); var dataM=labelsM.map(function(k){ return Number(byMonth[k].toFixed(2)); });
+          var labelsC=Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; }); var dataC=labelsC.map(function(k){ return Number(byCat[k].toFixed(2)); });
+          if (chart1) chart1.destroy(); if (chart2) chart2.destroy();
+          chart1=new Chart(ctx1,{type:'bar',data:{labels:labelsM,datasets:[{label:'Despesas por mês (R$)',data:dataM}]},options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});
+          chart2=new Chart(ctx2,{type:'doughnut',data:{labels:labelsC,datasets:[{data:dataC}]} });
         }
-      });
-    })();
+
+        function renderRulesTable(){
+          var rules=FinStore.loadRules(); var tb=document.querySelector('#tblRules tbody'); if(!tb) return; tb.innerHTML='';
+          rules.forEach(function(r,i){
+            var tr=document.createElement('tr'); tr.innerHTML='<td>'+r.pattern+'</td><td>'+r.categoria+'</td><td><button data-i=\"'+i+'\" class=\"btn btnDelRule\">Excluir</button></td>'; tb.appendChild(tr);
+          });
+          var dels=document.querySelectorAll('.btnDelRule');
+          dels.forEach(function(btn){ btn.addEventListener('click',function(e){ var i=Number(e.target.getAttribute('data-i')); var arr=FinStore.loadRules(); arr.splice(i,1); FinStore.saveRules(arr); renderRulesTable(); renderReports(); }); });
+        }
+
+        function refreshAll(){ refreshReceiptsTable(); refreshTxs(); if (document.getElementById('reports') && document.getElementById('reports').classList.contains('active')) renderReports(); renderRulesTable(); }
+
+        (function init(){
+          var cfg=FinStore.loadCfg(); var ep=document.getElementById('endpoint'); if (ep) ep.value=cfg.endpoint||'';
+          var uf=document.getElementById('uf'); if (uf) uf.value=cfg.uf||'MG';
+          var mode=cfg.parserMode||'proxy'; var r=document.querySelector('input[name=\"parserMode\"][value=\"'+mode+'\"]'); if(r) r.checked=true;
+          if('serviceWorker' in navigator){ navigator.serviceWorker.register('./sw.js').catch(function(){}); }
+          refreshAll();
+        })();
+
+      }catch(err){
+        console.error(err);
+        var el=document.getElementById('err'); var pre=document.getElementById('errlog');
+        if (el && pre){ pre.textContent=String(err && err.stack || err); el.style.display='block'; }
+      }
+    });
   </script>
 </body>
 </html>
